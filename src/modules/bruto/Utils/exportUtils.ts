@@ -21,8 +21,8 @@ interface ExcelRowData {
   'Nombre Completo': string;
   'Np': number;
   'Horas Extras': number;
-  'Valor Hora Extra Liquida': number;
-  'Total Horas Extras': number;
+  'Valor Hora Extra Bruto': number;
+  'Total Horas Extras(Liquido)': number;
   'Bono Pactado (Liquido)': number;
   'Diferencia Liquida': number;
   'Diferencia Bruta': number;
@@ -48,8 +48,8 @@ export const exportBonoSabadosToExcel = (
       'Nombre Completo': `${result.colaborador.first_name} ${result.colaborador.last_name}`,
       'Np': result.colaborador.user_id,
       'Horas Extras': result.horasExtrasTrabajadas,
-      'Valor Hora Extra Liquida': result.valorHoraExtra,
-      'Total Horas Extras': result.result.montoTotalHorasExtras,
+      'Valor Hora Extra Bruto': result.valorHoraExtra,
+      'Total Horas Extras(Liquido)': result.result.montoTotalHorasExtras,
       'Bono Pactado (Liquido)': result.montoBonoPactado,
       'Diferencia Liquida': result.result.diferenciaLiquida, // Mostrar valor real
       'Diferencia Bruta': result.result.diferenciaBruto // Mostrar valor real
@@ -64,8 +64,8 @@ export const exportBonoSabadosToExcel = (
       { wch: 25 }, // Nombre Completo
       { wch: 10 }, // Np
       { wch: 12 }, // Horas Extras
-      { wch: 20 }, // Valor Hora Extra Liquida
-      { wch: 18 }, // Total Horas Extras
+      { wch: 20 }, // Valor Hora Extra Bruto
+      { wch: 18 }, // Total Horas Extras(Liquido)
       { wch: 20 }, // Bono Pactado (Liquido)
       { wch: 18 }, // Diferencia Liquida
       { wch: 18 }  // Diferencia Bruta
@@ -144,8 +144,8 @@ export const exportBonoSabadosWithSummary = (
       'Nombre Completo': `${result.colaborador.first_name} ${result.colaborador.last_name}`,
       'Np': result.colaborador.user_id,
       'Horas Extras': result.horasExtrasTrabajadas,
-      'Valor Hora Extra Liquida': result.valorHoraExtra,
-      'Total Horas Extras': result.result.montoTotalHorasExtras,
+      'Valor Hora Extra Bruto': result.valorHoraExtra,
+      'Total Horas Extras(Liquido)': result.result.montoTotalHorasExtras,
       'Bono Pactado (Liquido)': result.montoBonoPactado,
       'Diferencia Liquida': Math.max(0, result.result.diferenciaLiquida), // Mostrar 0 si es negativo
       'Diferencia Bruta': Math.max(0, result.result.diferenciaBruto) // Mostrar 0 si es negativo

@@ -149,3 +149,61 @@ export async function obtenerDatosColaboradorAfpSalud(user_id: number): Promise<
     throw new Error('No se pudieron obtener los datos de AFP y Salud del colaborador');
   }
 }
+
+// Interfaces para cálculo de sueldo líquido
+export interface CalculoSueldoLiquidoRequest {
+  sueldo_base: number; // OBLIGATORIO
+  tipo_contrato?: number; // OPCIONAL
+  afp: string; // OBLIGATORIO
+  salud?: string; // OPCIONAL
+  gratificacion?: number; // OPCIONAL
+  asignacion_familiar?: number; // OPCIONAL
+  asignacion_colacion?: number; // OPCIONAL
+  asignacion_transporte?: number; // OPCIONAL
+  asignacion_otros?: number; // OPCIONAL
+}
+
+export interface CalculoSueldoLiquidoResponse {
+  haberes: {
+    sueldo_base: number;
+    gratificacion: number;
+    asignacion_familiar: number;
+    asignacion_colacion: number;
+    asignacion_transporte: number;
+    asignacion_otros: number;
+    "Total haberes": number;
+  };
+  deberes: {
+    descuento_afp: number;
+    descuento_salud: number;
+    descuento_cesantia: number;
+    impuesto: number;
+    "Total descuentos": number;
+  };
+  sueldo_liquido: number;
+  indicadores: {
+    fecha: string;
+    valor_utm: string;
+    valor_uf: string;
+    dolar: string;
+  };
+}
+
+/**
+ * Calcula el sueldo líquido a partir de un sueldo base y otros parámetros
+ * @param requestData Datos para el cálculo del sueldo líquido
+ * @returns Respuesta con el desglose completo del cálculo
+ */
+export async function calcularSueldoLiquido(requestData: CalculoSueldoLiquidoRequest): Promise<CalculoSueldoLiquidoResponse> {
+  try {
+    const response = await apiClient.post<CalculoSueldoLiquidoResponse>(
+      '/api/salary/calculo-sueldo-liquido/',
+      requestData
+    );
+    console.log(response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('Error al calcular sueldo líquido:', error);
+    throw new Error('No se pudo calcular el sueldo líquido');
+  }
+}

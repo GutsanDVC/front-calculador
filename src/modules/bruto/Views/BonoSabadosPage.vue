@@ -83,7 +83,8 @@ import {
   CalculoSueldoBrutoResponse
 } from '../Types/bruto.interface';
 import { 
-  calcularSueldoBrutoDesdeNeto
+  calcularSueldoBrutoDesdeNeto,
+  calcularSueldoLiquido
 } from '../Repositories/brutoRepository';
 import { 
   ValoresEconomicos, 
@@ -216,7 +217,13 @@ const calcularTodos = async () => {
       try {
         // Cálculos básicos
         const montoTotalHorasExtras = colaboradorData.valorHoraExtra * colaboradorData.horasExtrasTrabajadas;
-        const diferenciaLiquida = colaboradorData.montoBonoPactado - montoTotalHorasExtras;
+        console.log(montoTotalHorasExtras);
+        const calcularhrExtraLiquidas=await calcularSueldoLiquido({
+          sueldo_base: montoTotalHorasExtras,
+          afp: colaboradorData.afp
+        });
+        const horaExtraLiquido=calcularhrExtraLiquidas.sueldo_liquido;
+        const diferenciaLiquida = colaboradorData.montoBonoPactado - horaExtraLiquido;
         
         // Calcular el bruto de la diferencia líquida
         const diferenciaBruto = await calcularBrutoDiferencia(diferenciaLiquida, colaboradorData.afp);
@@ -229,7 +236,7 @@ const calcularTodos = async () => {
           
           // Desglose de liquidación (mantener para compatibilidad)
           montoBonoPactado: colaboradorData.montoBonoPactado,
-          montoTotalHorasExtras: montoTotalHorasExtras,
+          montoTotalHorasExtras: horaExtraLiquido,
           totalBrutoDiferencia: diferenciaBruto // Usar el valor calculado
         };
         

@@ -145,6 +145,24 @@ export async function getDatosColaboradorAfpSalud(user_id: number): Promise<Dato
   }
 }
 
+/**
+ * Obtiene los datos de AFP de un colaborador específico por su NP (user_id)
+ * @param np Número de personal (NP) del colaborador
+ * @returns Promise con los datos de AFP del colaborador
+ */
+export async function getAfpColaborador(np: number): Promise<{afp: string}> {
+  try {
+    const params = { np }
+    const response = await apiClient.get<{afp: string}>('/api/warehouse/afp-por-np/', { params });
+    return response.data;
+  } catch (error: any) {
+    console.error('Error al obtener datos AFP del colaborador:', error);
+    throw error;
+  }
+}
+
+
+
 // Interface para la compensación del colaborador
 export interface CompensacionColaborador {
   np: number;

@@ -55,7 +55,7 @@
             <div class="form-grid">
               <!-- Valor hora extra (readonly) -->
               <div class="form-field">
-                <label class="field-label">Valor Hora Extra (líquido)</label>
+                <label class="field-label">Valor Hora Extra (Bruto)</label>
                 <div class="input-group">
                   <input
                     :value="formatCurrency(colaboradorData.valorHoraExtra)"
@@ -101,19 +101,21 @@
               <!-- AFP -->
               <div class="form-field">
                 <label class="field-label">AFP</label>
-                <div class="select-wrapper">
-                  <select v-model="colaboradorData.afp" class="form-select">
-                    <option value="">Seleccionar AFP</option>
-                    <option
-                      v-for="option in afpOptions"
-                      :key="option.value"
-                      :value="option.value"
-                    >
-                      {{ option.label }}
-                    </option>
-                  </select>
-                  <i class="pi pi-chevron-down select-icon"></i>
+                <div class="input-group">
+                  <input
+                    :value="colaboradorData.afp"
+                    type="text"
+                    class="form-input readonly-input"
+                    readonly
+                  />
+                  <div v-if="colaboradorData.isLoadingAfp" class="loading-indicator">
+                    <i class="pi pi-spin pi-spinner"></i>
+                  </div>
                 </div>
+                <small v-if="colaboradorData.afpError" class="field-error">
+                  <i class="pi pi-exclamation-triangle"></i>
+                  {{ colaboradorData.afpError }}
+                </small>
               </div>
             </div>
 
@@ -182,11 +184,11 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import { Colaborador } from '../Types/bruto.interface';
-import { AFP_OPTIONS } from '../Constants/bruto.constants';
 import { formatCurrency } from '../Constants/brutoCalculations';
 import { 
   CompensacionColaborador,
-  getCompensacionPorNp
+  getCompensacionPorNp,
+  getAfpColaborador
 } from '../../../repository/colaboradoresRepository';
 
 // Interfaces
@@ -199,6 +201,8 @@ interface ColaboradorDataForm {
   compensacion?: CompensacionColaborador;
   isLoadingCompensacion: boolean;
   compensacionError: string;
+  isLoadingAfp: boolean;
+  afpError: string;
 }
 
 // Props y emits
@@ -215,7 +219,6 @@ const emit = defineEmits<{
 
 // Estado reactivo
 const colaboradoresDataLocal = ref<ColaboradorDataForm[]>([]);
-const afpOptions = ref(AFP_OPTIONS);
 
 // Computed
 const validFormsCount = computed(() => {
@@ -232,7 +235,9 @@ const isColaboradorDataValid = (data: ColaboradorDataForm): boolean => {
   return data.valorHoraExtra > 0 && 
          data.horasExtrasTrabajadas > 0 && 
          data.montoBonoPactado > 0 &&
-         data.afp !== '';
+         data.afp !== '' && // AFP debe estar cargada desde la API
+         !data.isLoadingCompensacion && 
+         !data.isLoadingAfp; // No debe estar cargando datos
 };
 
 const initializeColaboradoresData = async () => {
@@ -243,12 +248,17 @@ const initializeColaboradoresData = async () => {
     afp: '',
     valorHoraExtra: 0,
     isLoadingCompensacion: false,
-    compensacionError: ''
+    compensacionError: '',
+    isLoadingAfp: false,
+    afpError: ''
   }));
 
-  // Cargar compensación para cada colaborador
+  // Cargar compensación y AFP para cada colaborador
   for (const data of colaboradoresDataLocal.value) {
-    await cargarCompensacionColaborador(data);
+    await Promise.all([
+      cargarCompensacionColaborador(data),
+      cargarAfpColaborador(data)
+    ]);
   }
 };
 
@@ -266,6 +276,22 @@ const cargarCompensacionColaborador = async (colaboradorData: ColaboradorDataFor
     colaboradorData.valorHoraExtra = 0;
   } finally {
     colaboradorData.isLoadingCompensacion = false;
+  }
+};
+
+const cargarAfpColaborador = async (colaboradorData: ColaboradorDataForm) => {
+  colaboradorData.isLoadingAfp = true;
+  colaboradorData.afpError = '';
+  
+  try {
+    const afp_colaborador:{afp: string} = await getAfpColaborador(colaboradorData.colaborador.user_id);
+    colaboradorData.afp = afp_colaborador.afp;
+  } catch (error: any) {
+    console.error('Error al cargar AFP del colaborador:', error);
+    colaboradorData.afpError = 'Error al obtener datos de AFP';
+    colaboradorData.afp = '';
+  } finally {
+    colaboradorData.isLoadingAfp = false;
   }
 };
 
@@ -477,38 +503,6 @@ onMounted(() => {
   margin-top: 0.25rem;
 }
 
-.select-wrapper {
-  position: relative;
-}
-
-.form-select {
-  width: 100%;
-  padding: 0.75rem;
-  padding-right: 2.5rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.5rem;
-  font-size: 1rem;
-  background-color: white;
-  appearance: none;
-  cursor: pointer;
-  transition: border-color 0.2s;
-}
-
-.form-select:focus {
-  outline: none;
-  border-color: #dc2626;
-  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
-}
-
-.select-icon {
-  position: absolute;
-  right: 0.75rem;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #6b7280;
-  pointer-events: none;
-  font-size: 0.875rem;
-}
 
 .validation-status {
   display: flex;
