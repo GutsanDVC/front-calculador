@@ -98,6 +98,7 @@ import { useUserStore } from '../../../store/user';
 // Props
 interface Props {
   visible: boolean;
+  initialSearchQuery?: string;
 }
 
 const props = defineProps<Props>();
@@ -135,25 +136,35 @@ const filteredColaboradores = computed(() => {
   }
   
   const query = searchQuery.value.toLowerCase().trim();
-  
   return colaboradores.value.filter(colaborador => {
-    // Buscar por NP (user_id)
-    if (/^\d+$/.test(query)) {
-      return colaborador.user_id.toString().includes(query);
-    }
-    
-    // Buscar por nombre o apellido
     const nombreCompleto = `${colaborador.first_name} ${colaborador.last_name}`.toLowerCase();
+    const np = colaborador.user_id.toString();
+    
     return colaborador.first_name.toLowerCase().includes(query) ||
            colaborador.last_name.toLowerCase().includes(query) ||
-           nombreCompleto.includes(query);
+           nombreCompleto.includes(query) ||
+           np.includes(query);
   });
 });
 
 // Watchers
 watch(() => props.visible, (newValue) => {
   if (newValue) {
+    // Sincronizar el searchQuery inicial cuando se abre el modal
+    if (props.initialSearchQuery) {
+      searchQuery.value = props.initialSearchQuery;
+    }
     cargarColaboradores();
+  } else {
+    // Limpiar búsqueda cuando se cierra el modal
+    searchQuery.value = '';
+  }
+});
+
+// Watcher para sincronizar el searchQuery inicial
+watch(() => props.initialSearchQuery, (newQuery) => {
+  if (props.visible && newQuery !== undefined) {
+    searchQuery.value = newQuery;
   }
 });
 
