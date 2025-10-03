@@ -1,39 +1,156 @@
 <template>
-	<div class="h-screen grid p-0 relative">
+	<div class="auth-layout">
+		<!-- Panel izquierdo - Diseño geométrico -->
+		<div class="auth-left-panel">
+			<div class="geometric-design">
+				<div class="geometric-shape"></div>
+			</div>
+		</div>
 
-		<div class=" flex p-0 flex-column justify-content-between align-items-center relative"
-			id="login-panel">
-			<div class="flex justify-content-center relative w-full z-2 pt-6">
-				<div class="w-18rem" id="login-slot-group-image">
-					<img :src="global.utl.getFile(global.assets.LOGO_GRUPO_FLESAN)" class="w-full">
+		<!-- Panel derecho - Formulario de login -->
+		<div class="auth-right-panel">
+			<div class="auth-content">
+				<!-- Logo del grupo en la parte superior -->
+				<div class="group-logo">
+					<img :src="global.utl.getFile(global.assets.LOGO_GRUPO_FLESAN)" alt="Grupo Flesan" />
+				</div>
+
+				<!-- Contenedor del formulario -->
+				<div class="login-container">
+					<router-view></router-view>
 				</div>
 			</div>
-			<div class="flex justify-content-center">
-				<div class="w-25rem" id="login-slot-group-image">
-					<img :src="global.utl.getFile(global.assets.LOGO_WHITE)" class="w-full">
-				</div>
-			</div>
-			<div class="surface-card p-5 shadow-2 border-round w-full sm:w-25rem z-3 h-20rem" id="login-slot">
-				<router-view></router-view>
-			</div>
-			<div class="w-full flex  justify-content-center bg-white z-2">
-				<img :src="global.utl.getFile(global.assets.CINTA_LOGOS)" class="w-30rem">
-			</div>
-
-			<div class="absolute left-0 right-0 bottom-0 top-0 z-1" id="images-gray-squares"></div>
-
 		</div>
 	</div>
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, onUnmounted } from 'vue';
 import { useGlobalStore } from '../../store/global';
 
 const global = useGlobalStore();
 
 </script>
 
-<style>
-@import './AuthLayoutStyles.css';
+<style scoped>
+/* Layout principal - Split screen */
+.auth-layout {
+	display: flex;
+	height: 100vh;
+	overflow: hidden;
+}
+
+/* Panel izquierdo - Diseño geométrico */
+.auth-left-panel {
+	flex: 1;
+	background: linear-gradient(135deg, #4a4a4a 0%, #2c2c2c 100%);
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.geometric-design {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+}
+
+.geometric-shape {
+	position: absolute;
+	top: 0;
+	right: 0;
+	width: 60%;
+	height: 100%;
+	background: #E92828;
+	clip-path: polygon(30% 0%, 100% 0%, 100% 100%, 0% 100%);
+	z-index: 1;
+}
+
+/* Panel derecho - Formulario */
+.auth-right-panel {
+	flex: 1;
+	background: #ffffff;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 2rem;
+	box-sizing: border-box;
+}
+
+.auth-content {
+	width: 100%;
+	max-width: 400px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+/* Logo del grupo */
+.group-logo {
+	margin-bottom: 2rem;
+	text-align: center;
+}
+
+.group-logo img {
+	max-width: 200px;
+	height: auto;
+}
+
+/* Contenedor del login */
+.login-container {
+	width: 100%;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+	.auth-layout {
+		flex-direction: column;
+	}
+
+	.auth-left-panel {
+		flex: 0 0 200px;
+		order: 2;
+	}
+
+	.geometric-shape {
+		clip-path: polygon(0% 70%, 100% 30%, 100% 100%, 0% 100%);
+		width: 100%;
+		height: 70%;
+		bottom: 0;
+		top: auto;
+	}
+
+	.auth-right-panel {
+		flex: 1;
+		order: 1;
+		padding: 1.5rem;
+	}
+
+	.group-logo {
+		margin-bottom: 1.5rem;
+	}
+
+	.group-logo img {
+		max-width: 150px;
+	}
+}
+
+@media (max-width: 480px) {
+	.auth-right-panel {
+		padding: 1rem;
+	}
+
+	.auth-left-panel {
+		flex: 0 0 150px;
+	}
+
+	.group-logo {
+		margin-bottom: 1rem;
+	}
+
+	.group-logo img {
+		max-width: 120px;
+	}
+}
 </style>
