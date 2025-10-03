@@ -70,7 +70,7 @@
           </div>
           
           <!-- Loading inicial -->
-          <div v-if="loading && colaboradores.length === 0" class="initial-loading">
+          <div v-if="loading && !hasData" class="initial-loading">
             <i class="pi pi-spin pi-spinner"></i>
             <span>Cargando colaboradores...</span>
           </div>
@@ -79,10 +79,15 @@
           <div v-if="error" class="error-message">
             <i class="pi pi-exclamation-triangle"></i>
             <span>{{ error }}</span>
-            <button class="retry-button" @click="cargarColaboradores">
+            <button class="retry-button" @click="refreshColaboradores">
               <i class="pi pi-refresh"></i>
               Reintentar
             </button>
+          </div>
+          
+          <!-- Información de caché (solo en desarrollo) -->
+          <div v-if="showCacheInfo" class="cache-info-simple">
+            <small>{{ cacheTimestamp }}</small>
           </div>
         </div>
       </div>
@@ -166,8 +171,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { Colaborador } from '../Types/bruto.interface';
-import { getColaboradores, TipoContrato } from '../../../repository/colaboradoresRepository';
-import { useUserStore } from '../../../store/user';
+import { useCollaboratorStore } from '../../../store/collaboratorStore';
 
 // Props y emits
 const selectedColaboradores = defineModel<Colaborador[]>('selectedColaboradores', { default: () => [] });
@@ -177,66 +181,38 @@ const emit = defineEmits<{
 }>();
 
 // Store
-const userStore = useUserStore();
+const collaboratorStore = useCollaboratorStore();
 
 // Estado reactivo
 const searchQuery = ref('');
 const showDropdown = ref(false);
-const colaboradores = ref<Colaborador[]>([]);
-const loading = ref(false);
-const error = ref<string | null>(null);
 
 // Computed
-const puedeVerPlanta = computed(() => {
-  if (userStore.userInfo.data.global_access) {
-    return true;
-  }
-  const primerAcceso = userStore.userInfo.data.admin_access[0];
-  return primerAcceso?.ver_planta || false;
+const filteredColaboradores = computed(() => {
+  const excludeIds = selectedColaboradores.value.map(c => c.user_id);
+  return collaboratorStore.search(searchQuery.value, excludeIds);
 });
 
-const filteredColaboradores = computed(() => {
-  if (!searchQuery.value.trim()) {
-    return colaboradores.value;
-  }
-  
-  const query = searchQuery.value.toLowerCase().trim();
-  return colaboradores.value.filter(colaborador => {
-    // Verificar si ya está seleccionado
-    const isAlreadySelected = selectedColaboradores.value.some(
-      c => c.user_id === colaborador.user_id
-    );
-    
-    if (isAlreadySelected) return false;
-    
-    const nombreCompleto = `${colaborador.first_name} ${colaborador.last_name}`.toLowerCase();
-    const np = colaborador.user_id.toString();
-    const cargo = colaborador.nombre_cargo?.toLowerCase() || '';
-    const centro = colaborador.centro_costo?.toLowerCase() || '';
-    
-    return colaborador.first_name.toLowerCase().includes(query) ||
-           colaborador.last_name.toLowerCase().includes(query) ||
-           nombreCompleto.includes(query) ||
-           np.includes(query) ||
-           cargo.includes(query) ||
-           centro.includes(query);
-  });
-});
+// Computed para estados del store
+const loading = computed(() => collaboratorStore.isLoading);
+const error = computed(() => collaboratorStore.errorMessage);
+const hasData = computed(() => !collaboratorStore.isEmpty);
 
 // Funciones
 const cargarColaboradores = async () => {
-  loading.value = true;
-  error.value = null;
-  
   try {
-    const centrosCostos = userStore.userInfo.data.admin_access.map((access) => access.cc);
-    const data = await getColaboradores(centrosCostos, puedeVerPlanta.value);
-    colaboradores.value = data.results;
+    await collaboratorStore.initialize();
   } catch (e: any) {
-    error.value = e.message || 'Error al cargar colaboradores';
-    colaboradores.value = [];
-  } finally {
-    loading.value = false;
+    // El error ya está manejado por el store
+    console.error('Error al inicializar colaboradores:', e);
+  }
+};
+
+const refreshColaboradores = async () => {
+  try {
+    await collaboratorStore.refresh();
+  } catch (e: any) {
+    console.error('Error al refrescar colaboradores:', e);
   }
 };
 
@@ -275,6 +251,37 @@ const handleNext = () => {
     emit('next');
   }
 };
+
+// Estado para mostrar información de caché (solo en desarrollo)
+const showCacheInfo = computed(() => {
+  return process.env.NODE_ENV === 'development' && hasData.value;
+});
+
+// Formato de fecha y hora para el caché
+const cacheTimestamp = computed(() => {
+  const stats = collaboratorStore.getStats();
+  if (!stats.lastFetch) return '';
+  
+  const date = stats.lastFetch;
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  
+  if (isToday) {
+    return `Datos cargados hoy a las ${date.toLocaleTimeString('es-ES', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    })}`;
+  } else {
+    return `Datos cargados el ${date.toLocaleDateString('es-ES', { 
+      day: '2-digit', 
+      month: '2-digit', 
+      year: 'numeric' 
+    })} a las ${date.toLocaleTimeString('es-ES', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    })}`;
+  }
+});
 
 // Cargar colaboradores al montar el componente
 onMounted(() => {
@@ -542,6 +549,17 @@ onMounted(() => {
 
 .retry-button:hover {
   background-color: #b91c1c;
+}
+
+/* Información de caché (desarrollo) - versión simple */
+.cache-info-simple {
+  margin-top: 0.5rem;
+  text-align: center;
+}
+
+.cache-info-simple small {
+  color: #6b7280;
+  font-size: 0.75rem;
 }
 
 .selected-section {
