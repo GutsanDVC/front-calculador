@@ -45,6 +45,45 @@ export interface Colaborador {
   nombre_cargo: string; // Nombre del cargo
 }
 
+// Interfaces específicas para el módulo de finiquito
+export interface ColaboradorForm extends Colaborador {
+  form: {
+    fecha_desvinculacion: Date; // Fecha de desvinculación
+    tipo_solicitud: string; // Tipo de solicitud
+    causalTermino: string; // Causal de término
+    descuentoAfc: number | null; // Descuento AFC
+    grat: number; // Gratificación
+    otrosDescuentos: number | null; // Otros descuentos
+    letraCausal: string; // Letra de causal
+    mesAviso: number | null; // Mes de aviso
+    indemnizacion: number | null; // Indemnización
+  }
+}
+
+export interface Finiquito {
+  np: string;
+  anios_servicio: number;
+  tiempo_servido: number;
+  saldo_en_dias: number;
+  dias_inhabiles: number;
+  total_dias: number;
+  base_indemnizaciones: number;
+  base_vacaciones: number;
+  ias: number;
+  isap: number;
+  its: number;
+  ivac: number;
+  total_finiquito: number;
+  fecha_desvinculacion: Date;
+  causal: string;
+  letra_causal: string;
+  fecha_inset: Date;
+  national_id: string;
+  first_name: string;
+  last_name: string;
+  descuento_afc: number | null;
+}
+
 /**
  * Obtiene la lista de colaboradores filtrada por centros de costo
  * @param centrosCostos Array de códigos de centros de costo para filtrar
@@ -89,6 +128,22 @@ export async function getColaboradorPorCorreo(correo: string): Promise<Colaborad
     return response.data;
   } catch (error: any) {
     console.error('Error al buscar colaborador por correo:', error);
+    // Lanzamos el error para que el componente lo maneje y muestre mensaje amigable
+    throw error;
+  }
+}
+
+/**
+ * Realiza la simulación de finiquito usando el endpoint de Kiptor
+ * @param data Objeto colaborador con estructura esperada por el backend (incluye campo 'form')
+ * @returns Respuesta de la simulación
+ */
+export async function simularFiniquitoKiptor(data: ColaboradorForm): Promise<any> {
+  try {
+    const response = await apiClient.post('/api/finiquito/simulate-kiptor-settlement/', data);
+    return response.data;
+  } catch (error: any) {
+    console.error('Error al simular finiquito:', error);
     // Lanzamos el error para que el componente lo maneje y muestre mensaje amigable
     throw error;
   }

@@ -33,7 +33,7 @@ import { EssentialForm } from '../../shared/classes/EssentialForm';
 import { useGlobalStore } from '../../store/global';
 import { useStepperStore } from './steperSstore';
 import { getCausalesTermino, CausalTermino } from './causalesTerminoRepository';
-import {getCargos162} from './colaboradoresRepository';
+import { getCargos162 } from '../../repository/colaboradoresRepository';
 const props = defineProps<{ persona: any }>();
 const emit = defineEmits(['onValid']);
 const global = useGlobalStore();

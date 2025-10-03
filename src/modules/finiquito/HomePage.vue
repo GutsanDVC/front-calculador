@@ -24,7 +24,6 @@
       </header>
       <main>
         <div v-if="stepActiveRef === 0">
-          <h2>Seleccione uno o mas colaboradores</h2>
           <SeleccionPersonal/>
         </div>
         <div v-if="stepActiveRef === 1">

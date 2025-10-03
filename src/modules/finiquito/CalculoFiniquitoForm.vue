@@ -44,7 +44,7 @@
 // 1. Importaciones
 import { ref,reactive, computed, watch, toRefs, defineProps } from 'vue';
 import { useStepperStore } from './steperSstore';
-import { ColaboradorForm, TipoContrato } from './colaboradoresRepository';
+import { ColaboradorForm, TipoContrato } from '../../repository/colaboradoresRepository';
 import { EssentialForm } from '../../shared/classes/EssentialForm';
 import { useGlobalStore } from '../../store/global';
 import ColaboradorFiniquitoForm from './ColaboradorFiniquitoForm.vue';

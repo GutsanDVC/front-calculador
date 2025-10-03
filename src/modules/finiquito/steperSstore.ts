@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia';
-import { Colaborador, ColaboradorForm, Finiquito } from './colaboradoresRepository';
-import { simularFiniquitoKiptor } from './colaboradoresRepository';
+import { Colaborador, ColaboradorForm, Finiquito, simularFiniquitoKiptor } from '../../repository/colaboradoresRepository';
 
 export const useStepperStore = defineStore('stepper', {
     state: () => ({

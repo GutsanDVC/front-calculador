@@ -61,22 +61,92 @@
       </template>
       <form class="form-container" @submit.prevent="handleCreateUser">
         <div class="form-field">
-          <label for="np">N° Personal*</label>
-          <div class="input-group">
-            <InputText 
-              id="np" 
-              v-model="form.np" 
-              placeholder="Buscar colaborador por correo" 
-              readonly 
-              class="input-full"
-            />
-            <Button 
-              icon="pi pi-search" 
-              class="btn-search" 
-              @click="openSearchModal" 
+          <label for="colaborador-search">Seleccionar Colaborador*</label>
+          <div class="select-container">
+            <!-- Campo de búsqueda -->
+            <div class="search-input-wrapper">
+              <input
+                id="colaborador-search"
+                v-model="searchQuery"
+                type="text"
+                class="search-input"
+                placeholder="Buscar colaborador por nombre, NP o correo..."
+                @focus="showDropdown = true"
+                @input="handleSearchInput"
+                :disabled="creatingUser || collaboratorStore.isLoading"
+              />
+              <i v-if="collaboratorStore.isLoading" class="pi pi-spin pi-spinner search-loading"></i>
+              <i v-else class="pi pi-search search-icon"></i>
+            </div>
+            
+            <!-- Dropdown con colaboradores filtrados -->
+            <div v-if="showDropdown && !collaboratorStore.isLoading" class="dropdown-container">
+              <div v-if="filteredColaboradores.length > 0" class="dropdown-list">
+                <div class="dropdown-header">
+                  {{ filteredColaboradores.length }} colaborador(es) encontrado(s)
+                </div>
+                <div 
+                  v-for="colaborador in filteredColaboradores.slice(0, 20)" 
+                  :key="colaborador.user_id"
+                  class="dropdown-item"
+                  @click="selectColaborador(colaborador)"
+                >
+                  <div class="colaborador-info">
+                    <div class="colaborador-name">
+                      {{ colaborador.first_name }} {{ colaborador.last_name }}
+                    </div>
+                    <div class="colaborador-details">
+                      <span class="detail">NP: {{ colaborador.user_id }}</span>
+                      <span class="detail">{{ colaborador.correo_flesan || colaborador.correo_gmail }}</span>
+                      <span class="detail">{{ colaborador.centro_costo }}</span>
+                    </div>
+                  </div>
+                  <div class="select-indicator">
+                    <i class="pi pi-check"></i>
+                  </div>
+                </div>
+                <div v-if="filteredColaboradores.length > 20" class="dropdown-footer">
+                  Mostrando los primeros 20 resultados. Refine su búsqueda para ver más.
+                </div>
+              </div>
+              <div v-else class="dropdown-empty">
+                <i class="pi pi-search"></i>
+                <p>No se encontraron colaboradores</p>
+                <small v-if="searchQuery.trim()">con "{{ searchQuery }}"</small>
+              </div>
+            </div>
+            
+            <!-- Overlay para cerrar dropdown -->
+            <div v-if="showDropdown" class="dropdown-overlay" @click="showDropdown = false"></div>
+          </div>
+          
+          <!-- Loading inicial -->
+          <div v-if="collaboratorStore.isLoading && !collaboratorStore.count" class="initial-loading">
+            <i class="pi pi-spin pi-spinner"></i>
+            <span>Cargando colaboradores...</span>
+          </div>
+          
+          <!-- Error de carga -->
+          <div v-if="collaboratorStore.hasError" class="error-message">
+            <i class="pi pi-exclamation-triangle"></i>
+            <span>{{ collaboratorStore.errorMessage }}</span>
+            <button class="retry-button" @click="collaboratorStore.refresh()">
+              <i class="pi pi-refresh"></i>
+              Reintentar
+            </button>
+          </div>
+          
+          <!-- Opción alternativa: buscar por correo -->
+          <div class="alternative-search">
+            <button 
+              type="button"
+              class="btn-alternative"
+              @click="openSearchModal"
               :disabled="creatingUser"
-              v-tooltip.bottom="'Buscar colaborador por correo'"
-            />
+            >
+              <i class="pi pi-envelope"></i>
+              Buscar por correo específico
+            </button>
           </div>
         </div>
         <div class="form-field">
@@ -252,7 +322,8 @@
 // Importamos los métodos y tipos del repository
 import { ref, onMounted, watch } from 'vue'
 import { getAllGlobalUsers, createGlobalUser, type GlobalUser, type GlobalUserCreate, type GlobalUserUpdate, deleteGlobalUser, updateGlobalUser } from './repositories/global-access-user.repository'
-import { getColaboradores, getColaboradorPorCorreo, type Colaborador } from '../finiquito/colaboradoresRepository'
+import { getColaboradorPorCorreo, type Colaborador } from '../../repository/colaboradoresRepository'
+import { useCollaboratorStore } from '../../store/collaboratorStore'
 import { useUserStore } from '../../store/user'
 import Dropdown from 'primevue/dropdown'
 import Dialog from 'primevue/dialog'
@@ -279,10 +350,12 @@ const formError = ref<string | null>(null)
 const formSuccess = ref(false)
 const sidebarVisible = ref(false)
 
-// Estado para colaboradores y selección de NP
-const colaboradores = ref<Colaborador[]>([])
-const loadingColaboradores = ref(false)
-const selectedColaborador = ref<string | null>(null)
+// Store de colaboradores
+const collaboratorStore = useCollaboratorStore()
+
+// Estado para el selector con dropdown
+const searchQuery = ref('')
+const showDropdown = ref(false)
 
 // Estado para el modal de búsqueda por correo
 const searchModalVisible = ref(false)
@@ -305,22 +378,44 @@ const editForm = ref<GlobalUserUpdate>({
 const editError = ref<string | null>(null)
 const editSuccess = ref(false)
 
-// Computed para el Dropdown: user_id como string
+// Computed para colaboradores disponibles
 import { computed } from 'vue'
-const colaboradoresDropdown = computed(() =>
-  colaboradores.value.map(c => ({
-    ...c,
-    user_id: String(c.user_id)
-  }))
-)
+const colaboradoresDisponibles = computed(() => collaboratorStore.list)
+
+// Colaboradores filtrados por búsqueda
+const filteredColaboradores = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return colaboradoresDisponibles.value.slice(0, 20) // Mostrar los primeros 20 si no hay búsqueda
+  }
+  
+  const query = searchQuery.value.toLowerCase().trim()
+  return colaboradoresDisponibles.value.filter(colaborador => {
+    const nombreCompleto = `${colaborador.first_name} ${colaborador.last_name}`.toLowerCase()
+    const np = colaborador.user_id.toString()
+    const correo = (colaborador.correo_flesan || colaborador.correo_gmail || '').toLowerCase()
+    const centro = colaborador.centro_costo?.toLowerCase() || ''
+    
+    return colaborador.first_name.toLowerCase().includes(query) ||
+           colaborador.last_name.toLowerCase().includes(query) ||
+           nombreCompleto.includes(query) ||
+           np.includes(query) ||
+           correo.includes(query) ||
+           centro.includes(query)
+  })
+})
 
 // Store de usuario logueado
 const userStore = useUserStore()
 
-// Watcher para cargar colaboradores al abrir el sidebar y resetear el formulario
+// Watcher para inicializar colaboradores y resetear formulario
 watch(sidebarVisible, async (visible) => {
   if (visible) {
-    selectedColaborador.value = null
+    // Inicializar colaboradores si es necesario
+    await collaboratorStore.initialize()
+    
+    // Resetear formulario y búsqueda
+    searchQuery.value = ''
+    showDropdown.value = false
     form.value = {
       np: '',
       nombre: '',
@@ -332,18 +427,23 @@ watch(sidebarVisible, async (visible) => {
   }
 })
 
-// Función para cargar colaboradores
-// const fetchColaboradores = async () => {
-//   loadingColaboradores.value = true
-//   try {
-//     const res = await getColaboradores(userStore.userInfo.data.admin_access,'NFGA03')
-//     colaboradores.value = res.results || []
-//   } catch (e: any) {
-//     colaboradores.value = []
-//   } finally {
-//     loadingColaboradores.value = false
-//   }
-// }
+// Funciones para el selector con dropdown
+const handleSearchInput = () => {
+  showDropdown.value = true
+}
+
+const selectColaborador = (colaborador: Colaborador) => {
+  llenarFormularioColaborador(colaborador)
+  searchQuery.value = `${colaborador.first_name} ${colaborador.last_name} (${colaborador.user_id})`
+  showDropdown.value = false
+}
+
+// Función para buscar colaboradores localmente
+const buscarColaboradorLocal = (query: string): Colaborador[] => {
+  if (!query.trim()) return []
+  const resultados = collaboratorStore.search(query, [])
+  return resultados.slice(0, 10) // Limitar a 10 resultados
+}
 
 /**
  * Función para obtener un colaborador específico por su correo electrónico
@@ -420,47 +520,19 @@ const searchColaborador = async () => {
  */
 const selectSearchResult = () => {
   if (searchResult.value) {
-    // Llenar el formulario con los datos del colaborador encontrado
-    form.value.np = String(searchResult.value.user_id)
-    form.value.nombre = `${searchResult.value.first_name} ${searchResult.value.last_name}`
-    form.value.email = searchResult.value.correo_flesan || searchResult.value.correo_gmail || ''
-    form.value.usuario_creo = userStore.userInfo?.data?.email || ''
-    form.value.activo = true // Por defecto activo
-    form.value.ver_nfg = false // Por defecto sin acceso NFG
-    
-    // Cerrar el modal
+    llenarFormularioColaborador(searchResult.value)
     closeSearchModal()
   }
 }
 
-// Función para autocompletar campos al seleccionar un colaborador
-const onColaboradorSelect = () => {
-  const colab = colaboradores.value.find(c => String(c.user_id) === selectedColaborador.value)
-  if (colab) {
-    form.value.np = String(colab.user_id)
-    form.value.nombre = `${colab.first_name} ${colab.last_name}`
-    form.value.email = colab.correo_flesan || colab.correo_gmail || ''
-    form.value.usuario_creo = userStore.userInfo?.data?.email || ''
-  } else {
-    form.value.np = ''
-    form.value.nombre = ''
-    form.value.email = ''
-    form.value.usuario_creo = userStore.userInfo?.data?.email || ''
-  }
-}
-
-// Filtro personalizado para el Dropdown de NP
-const filterColaboradores = (option: Colaborador, filter: string) => {
-  console.log(option)
-  if (!filter) return true
-  const texto = filter.toLowerCase()
-  return (
-    (option.user_id && String(option.user_id).toLowerCase().includes(texto)) ||
-    (option.first_name && option.first_name.toLowerCase().includes(texto)) ||
-    (option.last_name && option.last_name.toLowerCase().includes(texto)) ||
-    (option.correo_flesan && option.correo_flesan.toLowerCase().includes(texto)) ||
-    (option.correo_gmail && option.correo_gmail.toLowerCase().includes(texto))
-  )
+// Función para llenar formulario con datos del colaborador
+const llenarFormularioColaborador = (colaborador: Colaborador) => {
+  form.value.np = String(colaborador.user_id)
+  form.value.nombre = `${colaborador.first_name} ${colaborador.last_name}`
+  form.value.email = colaborador.correo_flesan || colaborador.correo_gmail || ''
+  form.value.usuario_creo = userStore.userInfo?.data?.email || ''
+  form.value.activo = true
+  form.value.ver_nfg = false
 }
 
 // --- ESTADOS Y FUNCIONES PARA MODAL DE CONFIRMACIÓN DE ELIMINACIÓN ---
@@ -949,6 +1021,254 @@ onMounted(fetchUsers)
   background-color: #eff6ff;
 }
 
+/* === ESTILOS PARA SELECTOR CON DROPDOWN === */
+.select-container {
+  position: relative;
+}
+
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.75rem 3rem 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+  background-color: white;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.search-input:disabled {
+  background-color: #f9fafb;
+  cursor: not-allowed;
+}
+
+.search-icon,
+.search-loading {
+  position: absolute;
+  right: 1rem;
+  color: #6b7280;
+  pointer-events: none;
+}
+
+.search-loading {
+  color: #3b82f6;
+}
+
+/* Dropdown */
+.dropdown-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+}
+
+.dropdown-container {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin-top: 0.25rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  max-height: 300px;
+  overflow: hidden;
+}
+
+.dropdown-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.dropdown-header {
+  padding: 0.75rem 1rem;
+  background-color: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background-color: #f9fafb;
+}
+
+.colaborador-info {
+  flex: 1;
+}
+
+.colaborador-name {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.colaborador-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.detail {
+  font-size: 0.75rem;
+  color: #6b7280;
+  background-color: #f3f4f6;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+}
+
+.select-indicator {
+  color: #16a34a;
+  font-size: 1rem;
+  margin-left: 1rem;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.dropdown-item:hover .select-indicator {
+  opacity: 1;
+}
+
+.dropdown-footer {
+  padding: 0.5rem 1rem;
+  background-color: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  font-size: 0.75rem;
+  color: #6b7280;
+  text-align: center;
+}
+
+.dropdown-empty {
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: #6b7280;
+}
+
+.dropdown-empty i {
+  font-size: 1.25rem;
+  margin-bottom: 0.5rem;
+  color: #d1d5db;
+}
+
+.dropdown-empty p {
+  margin: 0.5rem 0 0.25rem 0;
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.dropdown-empty small {
+  color: #9ca3af;
+  font-size: 0.75rem;
+}
+
+/* Estados de carga y error */
+.initial-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  color: #6b7280;
+  background-color: #f9fafb;
+  border-radius: 0.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.error-message {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  color: #dc2626;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 0.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.retry-button {
+  margin-left: auto;
+  padding: 0.25rem 0.5rem;
+  background-color: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.retry-button:hover {
+  background-color: #b91c1c;
+}
+
+/* Búsqueda alternativa */
+.alternative-search {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.btn-alternative {
+  width: 100%;
+  padding: 0.5rem 1rem;
+  background-color: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-alternative:hover {
+  background-color: #e5e7eb;
+  color: #374151;
+}
+
+.btn-alternative:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* === RESPONSIVE === */
 @media (max-width: 768px) {
   .form-row {
@@ -959,18 +1279,24 @@ onMounted(fetchUsers)
     width: 100%;
   }
   
-  .input-group {
+  .dropdown-container {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin-top: 0;
+    border-radius: 1rem 1rem 0 0;
+    max-height: 60vh;
+  }
+  
+  .dropdown-item {
+    padding: 1rem;
+  }
+  
+  .colaborador-details {
     flex-direction: column;
-  }
-  
-  .input-full {
-    border-radius: 4px;
-    margin-bottom: 0.5rem;
-  }
-  
-  .btn-search {
-    border: 1px solid #d1d5db;
-    border-radius: 4px;
+    gap: 0.25rem;
   }
 }
 </style>

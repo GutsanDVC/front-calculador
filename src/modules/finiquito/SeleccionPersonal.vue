@@ -1,212 +1,936 @@
 <template>
-  <div>
-    <!-- <h2 class="text-lg font-bold mb-2">1. Selección de Personal</h2> -->
-    <DotLoader v-if="loading" msg="Cargando colaboradores..." />
-    <DataTable v-else :value="filteredUsers" selectionMode="multiple" v-model:selection="selectedUsers" dataKey="user_id"
-      :paginator="true" :rows="cantRows" :rowsPerPageOptions="[5, 10, 15]" class="mb-4">
-      <template #header>
-        <div class="flex gap-2">
-          <InputText v-model="search" placeholder="Buscar por nombre o NP..." class="w-4" />
-          <Dropdown v-model="selectedEmpresa" :options="empresas"  
-            placeholder="Filtrar empresa" class="w-2" filter filterBy="label" />
-          <Dropdown v-model="selectedCentro" :options="centros"  
-            placeholder="Filtrar centro de costo" class="w-2" filter filterBy="label" :disabled="selectedEmpresa === null" showClear />
-        </div>
-      </template>
-      <template #empty>
-        <div v-if="!loading" class="text-gray-500 py-8 text-center">No hay colaboradores para mostrar.</div>
-      </template>
-      <Column selectionMode="multiple" headerStyle="width: 3em" />
-      <Column field="user_id" header="NP" />
-      <Column field="first_name" header="Nombre" />
-      <Column field="last_name" header="Apellidos" />
-      <Column field="national_id" header="RUT">
-        <template #body="{ data }">
-          {{ formatRut(data.national_id) }}
-        </template> 
-      </Column>
-      <Column field="nombre_cargo" header="Cargo" />
-      <Column field="external_cod_tipo_contrato" header="Tipo de Contrato" >
-        <template #body="{ data }">
-          {{ TipoContrato[data.external_cod_tipo_contrato as keyof typeof TipoContrato] || 'Desconocido' }}
-        </template>
-      </Column>
-      <Column field="centro_costo" header="Centro de Costo">
-        <template #body="{ data }">
-          <div class="centroCosto">
-            <p class="centroCosto__codigo">{{ data.centro_costo }}</p>
-            <p class="centroCosto__nombre">{{ data.nombre_centro_costo }}</p>
-          </div>
-        </template>
-      </Column>
-    </DataTable>
-
-    <div v-if="!loading && selectedUsers.length === 0" class="text-red-600 mb-2 w-12 text-right">Debe seleccionar al menos una persona.
+  <div class="colaborador-selection-step">
+    <div class="step-header">
+      <h3 class="step-title">Seleccionar Colaboradores</h3>
+      <p class="step-description">
+        Seleccione uno o más colaboradores para calcular el finiquito
+      </p>
     </div>
-    <div v-else class="text-gray-500 mb-2 w-12 text-right">{{ selectedUsers.length }} personas seleccionadas.</div>
-</div>
-<footer class="foot-buttons">
-  <Button label="Siguiente" @click="nextStep" />
-</footer>
+
+    <div class="selection-content">
+      <!-- Filtros de empresa y centro -->
+      <div class="filters-section">
+        <div class="filter-group">
+          <label class="field-label">Empresa</label>
+          <Dropdown 
+            v-model="selectedEmpresa" 
+            :options="empresaOptions" 
+            optionLabel="label" 
+            optionValue="value"
+            placeholder="Seleccionar empresa" 
+            class="filter-dropdown"
+          />
+        </div>
+        <div class="filter-group">
+          <label class="field-label">Centro de Costo</label>
+          <Dropdown 
+            v-model="selectedCentro" 
+            :options="centroOptions" 
+            optionLabel="label" 
+            optionValue="value"
+            placeholder="Seleccionar centro" 
+            class="filter-dropdown"
+            :disabled="!selectedEmpresa"
+            showClear
+          />
+        </div>
+      </div>
+
+      <!-- Selector de colaboradores -->
+      <div class="search-section">
+        <div class="search-field">
+          <label class="field-label">Seleccionar Colaborador</label>
+          <div class="select-container">
+            <!-- Campo de búsqueda -->
+            <div class="search-input-wrapper">
+              <input
+                v-model="searchQuery"
+                type="text"
+                class="search-input"
+                placeholder="Buscar colaborador por nombre, NP o cargo..."
+                @focus="showDropdown = true"
+                @input="handleSearchInput"
+                :disabled="loading"
+              />
+              <i v-if="loading" class="pi pi-spin pi-spinner search-loading"></i>
+              <i v-else class="pi pi-search search-icon"></i>
+            </div>
+            
+            <!-- Dropdown con colaboradores filtrados -->
+            <div v-if="showDropdown && !loading" class="dropdown-container">
+              <div v-if="filteredColaboradores.length > 0" class="dropdown-list">
+                <div class="dropdown-header">
+                  {{ filteredColaboradores.length }} colaborador(es) encontrado(s)
+                </div>
+                <div 
+                  v-for="colaborador in filteredColaboradores.slice(0, 50)" 
+                  :key="colaborador.user_id"
+                  class="dropdown-item"
+                  @click="selectColaborador(colaborador)"
+                >
+                  <div class="colaborador-info">
+                    <div class="colaborador-name">
+                      {{ colaborador.first_name }} {{ colaborador.last_name }}
+                    </div>
+                    <div class="colaborador-details">
+                      <span class="detail">NP: {{ colaborador.user_id }}</span>
+                      <span class="detail">{{ colaborador.nombre_cargo }}</span>
+                      <span class="detail">{{ colaborador.centro_costo }}</span>
+                      <span class="detail">{{ formatRut(colaborador.national_id) }}</span>
+                    </div>
+                  </div>
+                  <div class="select-indicator">
+                    <i class="pi pi-plus"></i>
+                  </div>
+                </div>
+                <div v-if="filteredColaboradores.length > 50" class="dropdown-footer">
+                  Mostrando los primeros 50 resultados. Refine su búsqueda para ver más.
+                </div>
+              </div>
+              <div v-else class="dropdown-empty">
+                <i class="pi pi-search"></i>
+                <p>No se encontraron colaboradores</p>
+                <small v-if="searchQuery.trim()">con "{{ searchQuery }}"</small>
+              </div>
+            </div>
+            
+            <!-- Overlay para cerrar dropdown -->
+            <div v-if="showDropdown" class="dropdown-overlay" @click="showDropdown = false"></div>
+          </div>
+          
+          <!-- Loading inicial -->
+          <div v-if="loading && !hasData" class="initial-loading">
+            <i class="pi pi-spin pi-spinner"></i>
+            <span>Cargando colaboradores...</span>
+          </div>
+          
+          <!-- Error de carga -->
+          <div v-if="error" class="error-message">
+            <i class="pi pi-exclamation-triangle"></i>
+            <span>{{ error }}</span>
+            <button class="retry-button" @click="refreshColaboradores">
+              <i class="pi pi-refresh"></i>
+              Reintentar
+            </button>
+          </div>
+          
+          <!-- Información de caché (solo en desarrollo) -->
+          <div v-if="showCacheInfo" class="cache-info-simple">
+            <small>{{ cacheTimestamp }}</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista de colaboradores seleccionados -->
+      <div class="selected-section">
+        <div class="section-header">
+          <h4 class="section-title">
+            Colaboradores Seleccionados 
+            <span class="count-badge">{{ selectedUsers.length }}</span>
+          </h4>
+          <button 
+            v-if="selectedUsers.length > 0"
+            class="clear-all-button"
+            @click="clearAllColaboradores"
+          >
+            <i class="pi pi-trash"></i>
+            Limpiar Todo
+          </button>
+        </div>
+
+        <!-- Estado vacío -->
+        <div v-if="selectedUsers.length === 0" class="empty-state">
+          <i class="pi pi-users empty-icon"></i>
+          <p class="empty-message">No hay colaboradores seleccionados</p>
+          <p class="empty-hint">Use el buscador para agregar colaboradores</p>
+        </div>
+
+        <!-- Lista de colaboradores -->
+        <div v-else class="colaboradores-list">
+          <div 
+            v-for="colaborador in selectedUsers" 
+            :key="colaborador.user_id"
+            class="colaborador-card"
+          >
+            <div class="colaborador-info">
+              <div class="colaborador-main">
+                <h5 class="colaborador-name">
+                  {{ colaborador.first_name }} {{ colaborador.last_name }}
+                </h5>
+                <span class="colaborador-id">{{ colaborador.user_id }}</span>
+              </div>
+              <div class="colaborador-details">
+                <div class="detail-item">
+                  <span class="detail-label">RUT:</span>
+                  <span class="detail-value">{{ formatRut(colaborador.national_id) }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Centro Gestión:</span>
+                  <span class="detail-value">{{ colaborador.centro_costo }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Cargo:</span>
+                  <span class="detail-value">{{ colaborador.nombre_cargo }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Contrato:</span>
+                  <span class="detail-value">{{ getTipoContrato(colaborador.external_cod_tipo_contrato) }}</span>
+                </div>
+              </div>
+            </div>
+            <button 
+              class="remove-button"
+              @click="removeColaborador(colaborador.user_id)"
+              :title="`Remover ${colaborador.first_name} ${colaborador.last_name}`"
+            >
+              <i class="pi pi-times"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Acciones del paso -->
+    <div class="step-actions">
+      <button 
+        class="next-button"
+        @click="nextStep"
+        :disabled="selectedUsers.length === 0"
+      >
+        Siguiente
+        <i class="pi pi-arrow-right"></i>
+      </button>
+    </div>
+  </div>
 </template>
 <script lang="ts" setup>
 import { Utilities } from '../../shared/classes/Utilities';
-
-// Importa el repository de colaboradores y tipos
-import { ref, computed, onMounted, watch, onUnmounted } from 'vue';
-import { getColaboradores, Colaborador, TipoContrato } from './colaboradoresRepository';
-import { getCentrosCosto, CentroCosto } from './centrosCostoRepository';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useCollaboratorStore } from '../../store/collaboratorStore';
+import { Colaborador, TipoContrato } from '../../repository/colaboradoresRepository';
 import { useStepperStore } from './steperSstore';
 import { useUserStore } from '../../store/user';
+// Stores
 const stepperStore = useStepperStore();
-const formatRut = (rut: string) => Utilities.formatRut(rut);
+const collaboratorStore = useCollaboratorStore();
 const userStore = useUserStore();
-const usuarios = ref<Colaborador[]>([]);
-const loading = ref(false);
-const error = ref<string | null>(null);
-const search = ref('');
-const selectedCentro = ref<string>(userStore.userInfo.data.admin_access[0].cc);
-const selectedEmpresa = ref<string>(userStore.userInfo.data.admin_access[0].empresa);
+
+// Utilidades
+const formatRut = (rut: string) => Utilities.formatRut(rut);
+const getTipoContrato = (codigo: string): string => {
+  return TipoContrato[codigo as keyof typeof TipoContrato] || 'Desconocido';
+};
+
+// Estado reactivo
+const searchQuery = ref('');
+const showDropdown = ref(false);
 const selectedUsers = ref<Colaborador[]>([]);
-const centros = ref<string[]>(userStore.userInfo.data.admin_access.map(access => access.cc));
-const empresas = ref<string[]>(userStore.userInfo.data.admin_access.map(access => access.empresa));
+const selectedEmpresa = ref<string>(userStore.userInfo.data.admin_access[0].empresa);
+const selectedCentro = ref<string>(userStore.userInfo.data.admin_access[0].cc);
 
-// Constante reactiva para almacenar el tamaño de la ventana
-const windowSize = ref({ width: window.innerWidth, height: window.innerHeight });
+// Computed para estados del store
+const loading = computed(() => collaboratorStore.isLoading);
+const error = computed(() => collaboratorStore.errorMessage);
+const hasData = computed(() => !collaboratorStore.isEmpty);
 
-const cantRows = ref(5);
-// Función para actualizar el tamaño de la ventana
-function updateWindowSize() {
-	windowSize.value = {
-		width: window.innerWidth,
-		height: window.innerHeight
-	};
-}
-// Hook de ciclo de vida para inicializar y limpiar el listener de resize
-onMounted(async () => {
-	window.addEventListener('resize', updateWindowSize);
+// Opciones para dropdowns
+const empresaOptions = computed(() => {
+  const empresas = [...new Set(userStore.userInfo.data.admin_access.map(access => access.empresa))];
+  return empresas.map(empresa => ({ label: empresa, value: empresa }));
 });
 
-onUnmounted(() => {
-	window.removeEventListener('resize', updateWindowSize);
+const centroOptions = computed(() => {
+  if (!selectedEmpresa.value) return [];
+  const centros = userStore.userInfo.data.admin_access
+    .filter(access => access.empresa === selectedEmpresa.value)
+    .map(access => ({ label: access.cc, value: access.cc }));
+  return centros;
 });
 
-watch(()=>windowSize.value.height, () => {
-  if(windowSize.value.height < 1000) {
-    cantRows.value = 5;
+// Colaboradores filtrados por empresa y centro
+const colaboradoresDisponibles = computed(() => {
+  let colaboradores = collaboratorStore.list;
+  
+  if (selectedEmpresa.value) {
+    colaboradores = colaboradores.filter(c => c.empresa === selectedEmpresa.value);
   }
-  else {
-    cantRows.value = 10;
+  
+  if (selectedCentro.value) {
+    colaboradores = colaboradores.filter(c => c.centro_costo === selectedCentro.value);
   }
+  
+  return colaboradores;
 });
-async function cargarColaboradores() {
-  loading.value = true;
-  error.value = null;
-  try {
-    // Si hay centro seleccionado, filtra por centro_costo
-  const puedeVerPlanta = computed(() => {
-    if (userStore.userInfo.data.global_access) {
-      return true;
-    }
-    const acceso = userStore.userInfo.data.admin_access.find((access) => access.cc === selectedCentro.value);
-    return acceso?.ver_planta;
+
+// Colaboradores filtrados por búsqueda
+const filteredColaboradores = computed(() => {
+  const excludeIds = selectedUsers.value.map(c => c.user_id);
+  
+  if (!searchQuery.value.trim()) {
+    return colaboradoresDisponibles.value.filter(c => !excludeIds.includes(c.user_id));
+  }
+  
+  const query = searchQuery.value.toLowerCase().trim();
+  return colaboradoresDisponibles.value.filter(colaborador => {
+    if (excludeIds.includes(colaborador.user_id)) return false;
+    
+    const nombreCompleto = `${colaborador.first_name} ${colaborador.last_name}`.toLowerCase();
+    const np = colaborador.user_id.toString();
+    const cargo = colaborador.nombre_cargo?.toLowerCase() || '';
+    const centro = colaborador.centro_costo?.toLowerCase() || '';
+    
+    return colaborador.first_name.toLowerCase().includes(query) ||
+           colaborador.last_name.toLowerCase().includes(query) ||
+           nombreCompleto.includes(query) ||
+           np.includes(query) ||
+           cargo.includes(query) ||
+           centro.includes(query);
   });
-    const centrosCostos =selectedCentro.value?[selectedCentro.value]:userStore.userInfo.data.admin_access.map((access) => access.cc);
-    const data = await getColaboradores(centrosCostos,puedeVerPlanta.value);
-    usuarios.value = data.results
-    //console.log(usuarios.value)
-  } catch (e: any) {
-    error.value = e.message || 'Error al cargar colaboradores';
-    usuarios.value = [];
-  } finally {
-    loading.value = false;
-  }
-}
-async function cargarCentrosCosto() {
-  loading.value = true;
-  error.value = null;
-  try {
-    empresas.value = [...new Set(userStore.userInfo.data.admin_access.map((access) => access.empresa))];
-  } catch (e: any) {
-    error.value = e.message || 'Error al cargar centros de costo';
-    centros.value = [];
-  } finally {
-    loading.value = false;
-  }
-}
-watch(selectedEmpresa, () => {
-  centros.value = userStore.userInfo.data.admin_access.filter((access) => access.empresa === selectedEmpresa.value).map((access) => access.cc);
-  selectedCentro.value =centros.value[0];
-  cargarColaboradores();
 });
+// Funciones
+const cargarColaboradores = async () => {
+  try {
+    await collaboratorStore.initialize();
+  } catch (e: any) {
+    console.error('Error al inicializar colaboradores:', e);
+  }
+};
+
+const refreshColaboradores = async () => {
+  try {
+    await collaboratorStore.refresh();
+  } catch (e: any) {
+    console.error('Error al refrescar colaboradores:', e);
+  }
+};
+
+const handleSearchInput = () => {
+  showDropdown.value = true;
+};
+
+const selectColaborador = (colaborador: Colaborador) => {
+  const isAlreadySelected = selectedUsers.value.some(
+    c => c.user_id === colaborador.user_id
+  );
+  
+  if (!isAlreadySelected) {
+    selectedUsers.value.push(colaborador);
+  }
+  
+  searchQuery.value = '';
+  showDropdown.value = false;
+};
+
+const removeColaborador = (userId: number) => {
+  selectedUsers.value = selectedUsers.value.filter(
+    c => c.user_id !== userId
+  );
+};
+
+const clearAllColaboradores = () => {
+  selectedUsers.value = [];
+};
+// Watchers
+watch(selectedEmpresa, () => {
+  // Resetear centro cuando cambia empresa
+  selectedCentro.value = '';
+  if (centroOptions.value.length > 0) {
+    selectedCentro.value = centroOptions.value[0].value;
+  }
+});
+
 watch(selectedUsers, () => {
   if (selectedUsers.value.length > 0) {
     stepperStore.setPersonasSeleccionadas([...selectedUsers.value]);
   }
-});
-onMounted(async () => {
-  await cargarColaboradores();
-  await cargarCentrosCosto();
-});
-
-watch(selectedCentro, () => {
-  cargarColaboradores();
-});
+}, { deep: true });
 
 const nextStep = () => {
   if (selectedUsers.value.length === 0) {
-    error.value = 'Debe seleccionar al menos una persona.';
     return;
   }
   stepperStore.nextStep();
-}
-// const centros = computed(() => {
-//   const centrosUnicos = [...new Set(usuarios.value.map(u => u.centro_costo))];
-//   return [
-//     { label: 'Todos', value: null },
-//     ...centrosUnicos.map(c => ({ label: c, value: c })),
-//   ];
-// });
+};
 
-const filteredUsers = computed<Colaborador[]>(() => {
-  let result = usuarios.value;
-  if (search.value) {
-    const s = search.value.toLowerCase();
-    result = result.filter(u => u.first_name.toLowerCase().includes(s)||u.last_name.toLowerCase().includes(s) || u.user_id.toString().includes(s));
+// Estado para mostrar información de caché (solo en desarrollo)
+const showCacheInfo = computed(() => {
+  return process.env.NODE_ENV === 'development' && hasData.value;
+});
+
+// Formato de fecha y hora para el caché
+const cacheTimestamp = computed(() => {
+  const stats = collaboratorStore.getStats();
+  if (!stats.lastFetch) return '';
+  
+  const date = stats.lastFetch;
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  
+  if (isToday) {
+    return `Datos cargados hoy a las ${date.toLocaleTimeString('es-ES', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    })}`;
+  } else {
+    return `Datos cargados el ${date.toLocaleDateString('es-ES', { 
+      day: '2-digit', 
+      month: '2-digit', 
+      year: 'numeric' 
+    })} a las ${date.toLocaleTimeString('es-ES', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    })}`;
   }
-  // console.log(result);
-  return result;
+});
+
+// Cargar colaboradores al montar el componente
+onMounted(() => {
+  cargarColaboradores();
 });
 
 
 </script>
 <style scoped>
-
-.centroCosto {
+.colaborador-selection-step {
   display: flex;
   flex-direction: column;
-  justify-content: right;
-  /* align-items: center; */
-  gap: 1px;
-  padding: 0px;
-  margin: 0px;
+  gap: 2rem;
+  height: 100%;
 }
 
-.centroCosto__codigo {
-  padding:0;
-  margin:0;
-  font-size: 12px;
-  color: var(--primary-color);
+.step-header {
+  text-align: center;
+  margin-bottom: 1rem;
 }
 
-.centroCosto__nombre {
-  padding:0;
-  margin:0;
-  font-size: 14px;
+.step-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
 }
-.foot-buttons {
+
+.step-description {
+  color: #6b7280;
+  font-size: 1rem;
+}
+
+.selection-content {
+  flex: 1;
   display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* Filtros de empresa y centro */
+.filters-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  background: #f9fafb;
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.field-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.filter-dropdown {
+  width: 100%;
+}
+
+/* Sección de búsqueda */
+.search-section {
+  background: #f9fafb;
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+}
+
+.search-field {
+  margin-bottom: 0;
+}
+
+/* Selector con dropdown */
+.select-container {
+  position: relative;
+}
+
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.75rem 3rem 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  transition: all 0.2s;
+  background-color: white;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.search-input:disabled {
+  background-color: #f9fafb;
+  cursor: not-allowed;
+}
+
+.search-icon,
+.search-loading {
+  position: absolute;
+  right: 1rem;
+  color: #6b7280;
+  pointer-events: none;
+}
+
+.search-loading {
+  color: #dc2626;
+}
+
+/* Dropdown */
+.dropdown-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+}
+
+.dropdown-container {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin-top: 0.25rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  max-height: 400px;
+  overflow: hidden;
+}
+
+.dropdown-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.dropdown-header {
+  padding: 0.75rem 1rem;
+  background-color: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background-color: #f9fafb;
+}
+
+.colaborador-info {
+  flex: 1;
+}
+
+.colaborador-name {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.25rem;
+  font-size: 0.95rem;
+}
+
+.colaborador-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.detail {
+  font-size: 0.8rem;
+  color: #6b7280;
+  background-color: #f3f4f6;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+}
+
+.select-indicator {
+  color: #059669;
+  font-size: 1.125rem;
+  margin-left: 1rem;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.dropdown-item:hover .select-indicator {
+  opacity: 1;
+}
+
+.dropdown-footer {
+  padding: 0.75rem 1rem;
+  background-color: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  font-size: 0.8rem;
+  color: #6b7280;
+  text-align: center;
+}
+
+.dropdown-empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #6b7280;
+}
+
+.dropdown-empty i {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: #d1d5db;
+}
+
+.dropdown-empty p {
+  margin: 0.5rem 0 0.25rem 0;
+  font-weight: 500;
+}
+
+.dropdown-empty small {
+  color: #9ca3af;
+}
+
+/* Estados de carga y error */
+.initial-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  color: #6b7280;
+  background-color: #f9fafb;
+  border-radius: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.error-message {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  color: #dc2626;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.retry-button {
+  margin-left: auto;
+  padding: 0.375rem 0.75rem;
+  background-color: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.retry-button:hover {
+  background-color: #b91c1c;
+}
+
+/* Información de caché (desarrollo) - versión simple */
+.cache-info-simple {
+  margin-top: 0.5rem;
+  text-align: center;
+}
+
+.cache-info-simple small {
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
+.selected-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.count-badge {
+  background-color: #dc2626;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  min-width: 1.5rem;
+  text-align: center;
+}
+
+.clear-all-button {
+  padding: 0.5rem 1rem;
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.clear-all-button:hover {
+  background-color: #dc2626;
+}
+
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #6b7280;
+  padding: 3rem 1rem;
+}
+
+.empty-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  color: #d1d5db;
+}
+
+.empty-message {
+  font-size: 1.125rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.empty-hint {
+  font-size: 0.875rem;
+}
+
+.colaboradores-list {
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
-  justify-content: end;
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.colaborador-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  transition: all 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.colaborador-card:hover {
+  border-color: #dc2626;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.colaborador-main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.colaborador-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.colaborador-id {
+  background-color: #f3f4f6;
+  color: #6b7280;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+}
+
+.colaborador-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.detail-item {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.detail-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+  min-width: 100px;
+}
+
+.detail-value {
+  font-size: 0.875rem;
+  color: #1f2937;
+}
+
+.remove-button {
+  padding: 0.5rem;
+  background-color: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.remove-button:hover {
+  background-color: #dc2626;
+  color: white;
+}
+
+.step-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.next-button {
+  padding: 0.75rem 2rem;
+  background-color: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.next-button:hover:not(:disabled) {
+  background-color: #b91c1c;
+}
+
+.next-button:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .filters-section {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .dropdown-container {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin-top: 0;
+    border-radius: 1rem 1rem 0 0;
+    max-height: 70vh;
+  }
+  
+  .dropdown-item {
+    padding: 1.25rem 1rem;
+  }
+  
+  .colaborador-details {
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+  
+  .section-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  
+  .colaborador-card {
+    padding: 1rem;
+  }
+  
+  .colaborador-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .detail-item {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .detail-label {
+    min-width: auto;
+  }
 }
 </style>
