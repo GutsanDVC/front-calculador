@@ -8,34 +8,80 @@
     </div>
 
     <div class="selection-content">
-      <!-- Buscador de colaboradores -->
+      <!-- Selector de colaboradores -->
       <div class="search-section">
         <div class="search-field">
-          <label class="field-label">Buscar Colaborador</label>
-          <div class="input-group">
-            <input
-              v-model="searchQuery"
-              type="text"
-              class="form-input"
-              :class="{ 'has-search': searchQuery.trim() }"
-              placeholder="Buscar por nombre, RUT o código de colaborador"
-              @keyup.enter="openSearchModal"
-            />
-            <button
-              class="search-button"
-              :class="{ 'active': searchQuery.trim() }"
-              @click="openSearchModal"
-            >
-              <i class="pi pi-search"></i>
-              {{ searchQuery.trim() ? 'Buscar' : 'Buscar' }}
-            </button>
-            <button
-              v-if="searchQuery.trim()"
-              class="clear-search-button"
-              @click="clearSearch"
-              title="Limpiar búsqueda"
-            >
-              <i class="pi pi-times"></i>
+          <label class="field-label">Seleccionar Colaborador</label>
+          <div class="select-container">
+            <!-- Campo de búsqueda -->
+            <div class="search-input-wrapper">
+              <input
+                v-model="searchQuery"
+                type="text"
+                class="search-input"
+                placeholder="Buscar colaborador por nombre, NP o cargo..."
+                @focus="showDropdown = true"
+                @input="handleSearchInput"
+                :disabled="loading"
+              />
+              <i v-if="loading" class="pi pi-spin pi-spinner search-loading"></i>
+              <i v-else class="pi pi-search search-icon"></i>
+            </div>
+            
+            <!-- Dropdown con colaboradores filtrados -->
+            <div v-if="showDropdown && !loading" class="dropdown-container">
+              <div v-if="filteredColaboradores.length > 0" class="dropdown-list">
+                <div class="dropdown-header">
+                  {{ filteredColaboradores.length }} colaborador(es) encontrado(s)
+                </div>
+                <div 
+                  v-for="colaborador in filteredColaboradores.slice(0, 50)" 
+                  :key="colaborador.user_id"
+                  class="dropdown-item"
+                  @click="selectColaborador(colaborador)"
+                >
+                  <div class="colaborador-info">
+                    <div class="colaborador-name">
+                      {{ colaborador.first_name }} {{ colaborador.last_name }}
+                    </div>
+                    <div class="colaborador-details">
+                      <span class="detail">NP: {{ colaborador.user_id }}</span>
+                      <span class="detail">{{ colaborador.nombre_cargo }}</span>
+                      <span class="detail">{{ colaborador.centro_costo }}</span>
+                    </div>
+                  </div>
+                  <div class="select-indicator">
+                    <i class="pi pi-plus"></i>
+                  </div>
+                </div>
+                <div v-if="filteredColaboradores.length > 50" class="dropdown-footer">
+                  Mostrando los primeros 50 resultados. Refine su búsqueda para ver más.
+                </div>
+              </div>
+              <div v-else class="dropdown-empty">
+                <i class="pi pi-search"></i>
+                <p>No se encontraron colaboradores</p>
+                <small v-if="searchQuery.trim()">con "{{ searchQuery }}"</small>
+              </div>
+            </div>
+            
+            <!-- Overlay para cerrar dropdown -->
+            <div v-if="showDropdown" class="dropdown-overlay" @click="showDropdown = false"></div>
+          </div>
+          
+          <!-- Loading inicial -->
+          <div v-if="loading && colaboradores.length === 0" class="initial-loading">
+            <i class="pi pi-spin pi-spinner"></i>
+            <span>Cargando colaboradores...</span>
+          </div>
+          
+          <!-- Error de carga -->
+          <div v-if="error" class="error-message">
+            <i class="pi pi-exclamation-triangle"></i>
+            <span>{{ error }}</span>
+            <button class="retry-button" @click="cargarColaboradores">
+              <i class="pi pi-refresh"></i>
+              Reintentar
             </button>
           </div>
         </div>
@@ -114,19 +160,14 @@
       </button>
     </div>
 
-    <!-- Modal de búsqueda -->
-    <ColaboradorSearchModal
-      v-model:visible="searchModalVisible"
-      :initial-search-query="searchQuery"
-      @colaborador-selected="onColaboradorSelected"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { Colaborador } from '../Types/bruto.interface';
-import ColaboradorSearchModal from './ColaboradorSearchModal.vue';
+import { getColaboradores, TipoContrato } from '../../../repository/colaboradoresRepository';
+import { useUserStore } from '../../../store/user';
 
 // Props y emits
 const selectedColaboradores = defineModel<Colaborador[]>('selectedColaboradores', { default: () => [] });
@@ -135,16 +176,75 @@ const emit = defineEmits<{
   next: []
 }>();
 
+// Store
+const userStore = useUserStore();
+
 // Estado reactivo
 const searchQuery = ref('');
-const searchModalVisible = ref(false);
+const showDropdown = ref(false);
+const colaboradores = ref<Colaborador[]>([]);
+const loading = ref(false);
+const error = ref<string | null>(null);
+
+// Computed
+const puedeVerPlanta = computed(() => {
+  if (userStore.userInfo.data.global_access) {
+    return true;
+  }
+  const primerAcceso = userStore.userInfo.data.admin_access[0];
+  return primerAcceso?.ver_planta || false;
+});
+
+const filteredColaboradores = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return colaboradores.value;
+  }
+  
+  const query = searchQuery.value.toLowerCase().trim();
+  return colaboradores.value.filter(colaborador => {
+    // Verificar si ya está seleccionado
+    const isAlreadySelected = selectedColaboradores.value.some(
+      c => c.user_id === colaborador.user_id
+    );
+    
+    if (isAlreadySelected) return false;
+    
+    const nombreCompleto = `${colaborador.first_name} ${colaborador.last_name}`.toLowerCase();
+    const np = colaborador.user_id.toString();
+    const cargo = colaborador.nombre_cargo?.toLowerCase() || '';
+    const centro = colaborador.centro_costo?.toLowerCase() || '';
+    
+    return colaborador.first_name.toLowerCase().includes(query) ||
+           colaborador.last_name.toLowerCase().includes(query) ||
+           nombreCompleto.includes(query) ||
+           np.includes(query) ||
+           cargo.includes(query) ||
+           centro.includes(query);
+  });
+});
 
 // Funciones
-const openSearchModal = () => {
-  searchModalVisible.value = true;
+const cargarColaboradores = async () => {
+  loading.value = true;
+  error.value = null;
+  
+  try {
+    const centrosCostos = userStore.userInfo.data.admin_access.map((access) => access.cc);
+    const data = await getColaboradores(centrosCostos, puedeVerPlanta.value);
+    colaboradores.value = data.results;
+  } catch (e: any) {
+    error.value = e.message || 'Error al cargar colaboradores';
+    colaboradores.value = [];
+  } finally {
+    loading.value = false;
+  }
 };
 
-const onColaboradorSelected = (colaborador: Colaborador) => {
+const handleSearchInput = () => {
+  showDropdown.value = true;
+};
+
+const selectColaborador = (colaborador: Colaborador) => {
   // Verificar si el colaborador ya está seleccionado
   const isAlreadySelected = selectedColaboradores.value.some(
     c => c.user_id === colaborador.user_id
@@ -152,9 +252,11 @@ const onColaboradorSelected = (colaborador: Colaborador) => {
   
   if (!isAlreadySelected) {
     selectedColaboradores.value.push(colaborador);
-    // Limpiar el buscador después de seleccionar un colaborador
-    searchQuery.value = '';
   }
+  
+  // Limpiar búsqueda y cerrar dropdown
+  searchQuery.value = '';
+  showDropdown.value = false;
 };
 
 const removeColaborador = (userId: number) => {
@@ -167,15 +269,17 @@ const clearAllColaboradores = () => {
   selectedColaboradores.value = [];
 };
 
-const clearSearch = () => {
-  searchQuery.value = '';
-};
 
 const handleNext = () => {
   if (selectedColaboradores.value.length > 0) {
     emit('next');
   }
 };
+
+// Cargar colaboradores al montar el componente
+onMounted(() => {
+  cargarColaboradores();
+});
 </script>
 
 <style scoped>
@@ -229,73 +333,215 @@ const handleNext = () => {
   margin-bottom: 0.5rem;
 }
 
-.input-group {
-  display: flex;
-  gap: 0.75rem;
+/* Selector con dropdown */
+.select-container {
+  position: relative;
 }
 
-.form-input {
-  flex: 1;
-  padding: 0.75rem;
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.75rem 3rem 0.75rem 1rem;
   border: 1px solid #d1d5db;
   border-radius: 0.5rem;
   font-size: 1rem;
-  transition: border-color 0.2s;
+  transition: all 0.2s;
+  background-color: white;
 }
 
-.form-input:focus {
+.search-input:focus {
   outline: none;
   border-color: #dc2626;
   box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
 }
 
-.search-button {
-  padding: 0.75rem 1.5rem;
-  background-color: #dc2626;
-  color: white;
-  border: none;
+.search-input:disabled {
+  background-color: #f9fafb;
+  cursor: not-allowed;
+}
+
+.search-icon,
+.search-loading {
+  position: absolute;
+  right: 1rem;
+  color: #6b7280;
+  pointer-events: none;
+}
+
+.search-loading {
+  color: #dc2626;
+}
+
+/* Dropdown */
+.dropdown-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+}
+
+.dropdown-container {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin-top: 0.25rem;
+  background: white;
+  border: 1px solid #e5e7eb;
   border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  max-height: 400px;
+  overflow: hidden;
+}
+
+.dropdown-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.dropdown-header {
+  padding: 0.75rem 1rem;
+  background-color: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.875rem;
   font-weight: 500;
+  color: #6b7280;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border-bottom: 1px solid #f3f4f6;
   cursor: pointer;
   transition: background-color 0.2s;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background-color: #f9fafb;
+}
+
+.colaborador-info {
+  flex: 1;
+}
+
+.colaborador-name {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.25rem;
+  font-size: 0.95rem;
+}
+
+.colaborador-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.detail {
+  font-size: 0.8rem;
+  color: #6b7280;
+  background-color: #f3f4f6;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+}
+
+.select-indicator {
+  color: #059669;
+  font-size: 1.125rem;
+  margin-left: 1rem;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.dropdown-item:hover .select-indicator {
+  opacity: 1;
+}
+
+.dropdown-footer {
+  padding: 0.75rem 1rem;
+  background-color: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  font-size: 0.8rem;
+  color: #6b7280;
+  text-align: center;
+}
+
+.dropdown-empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #6b7280;
+}
+
+.dropdown-empty i {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: #d1d5db;
+}
+
+.dropdown-empty p {
+  margin: 0.5rem 0 0.25rem 0;
+  font-weight: 500;
+}
+
+.dropdown-empty small {
+  color: #9ca3af;
+}
+
+/* Estados de carga y error */
+.initial-loading {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  white-space: nowrap;
+  padding: 1rem;
+  color: #6b7280;
+  background-color: #f9fafb;
+  border-radius: 0.5rem;
+  margin-top: 0.5rem;
 }
 
-.search-button:hover {
-  background-color: #b91c1c;
+.error-message {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  color: #dc2626;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 0.5rem;
+  margin-top: 0.5rem;
 }
 
-.search-button.active {
-  background-color: #059669;
-}
-
-.search-button.active:hover {
-  background-color: #047857;
-}
-
-.clear-search-button {
-  padding: 0.75rem;
-  background-color: #6b7280;
+.retry-button {
+  margin-left: auto;
+  padding: 0.375rem 0.75rem;
+  background-color: #dc2626;
   color: white;
   border: none;
-  border-radius: 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
   cursor: pointer;
   transition: background-color 0.2s;
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 0.375rem;
 }
 
-.clear-search-button:hover {
-  background-color: #4b5563;
-}
-
-.form-input.has-search {
-  border-color: #059669;
-  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+.retry-button:hover {
+  background-color: #b91c1c;
 }
 
 .selected-section {
@@ -501,12 +747,24 @@ const handleNext = () => {
 
 /* Responsive */
 @media (max-width: 768px) {
-  .input-group {
-    flex-direction: column;
+  .dropdown-container {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin-top: 0;
+    border-radius: 1rem 1rem 0 0;
+    max-height: 70vh;
   }
   
-  .search-button {
-    justify-content: center;
+  .dropdown-item {
+    padding: 1.25rem 1rem;
+  }
+  
+  .colaborador-details {
+    flex-direction: column;
+    gap: 0.375rem;
   }
   
   .section-header {
