@@ -4,7 +4,7 @@
     <div class="welcome-header">
       <div class="welcome-content">
         <h1 class="welcome-title">
-          Bienvenido al <span class="brand-text">Calculador de Recursos Humanos</span>
+          Bienvenido al Calculador de <span class="brand-text">Recursos Humanos</span>
         </h1>
         <p class="welcome-subtitle">
           Sistema integral para el cálculo  de finiquitos y sueldos brutos
@@ -146,7 +146,7 @@ const navigateToBruto = () => {
 }
 
 .brand-text {
-  color: #f30707;
+  color: #f0adad;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
