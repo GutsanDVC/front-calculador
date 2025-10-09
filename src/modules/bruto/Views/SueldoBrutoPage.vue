@@ -11,31 +11,25 @@
           <div class="form-section">
             <label class="field-label">Sueldo líquido deseado</label>
             <input
-              v-model.number="formData.sueldoLiquidoDeseado"
-              type="number"
+              v-model="sueldoLiquidoFormateado"
+              type="text"
               class="form-input"
               placeholder="Ingrese el sueldo líquido deseado"
-              min="0"
-              step="1000"
+              @input="onSueldoLiquidoInput"
+              @blur="formatSueldoLiquido"
             />
           </div>
 
-          <!-- Tipo de contrato -->
+          <!-- Tipo de contrato (siempre indefinido) -->
           <div class="form-section">
             <label class="field-label">Tipo de contrato</label>
-            <div class="select-wrapper">
-              <select v-model="formData.tipoContrato" class="form-select">
-                <option value="">Seleccionar tipo de contrato</option>
-                <option
-                  v-for="option in tipoContratoOptions"
-                  :key="option.value"
-                  :value="option.value"
-                >
-                  {{ option.label }}
-                </option>
-              </select>
-              <i class="pi pi-chevron-down select-icon"></i>
-            </div>
+            <input
+              v-model="tipoContratoLabel"
+              type="text"
+              class="form-input"
+              readonly
+              disabled
+            />
           </div>
 
           <!-- AFP -->
@@ -56,96 +50,92 @@
             </div>
           </div>
 
-          <!-- Previsión -->
+          <!-- Previsión (siempre Fonasa) -->
           <div class="form-section">
             <label class="field-label">Previsión</label>
-            <div class="select-wrapper">
-              <select v-model="formData.prevision" class="form-select" @change="onPrevisionChange">
-                <option value="">Seleccionar previsión</option>
-                <option
-                  v-for="option in previsionOptions"
-                  :key="option.value"
-                  :value="option.value"
-                >
-                  {{ option.label }}
-                </option>
-              </select>
-              <i class="pi pi-chevron-down select-icon"></i>
-            </div>
-            
-            <!-- Campo condicional para monto Isapre -->
-            <div v-if="formData.prevision === 'Isapre'" class="isapre-amount-field">
-              <label class="field-label">Monto plan Isapre</label>
-              <input
-                v-model.number="formData.planIsapre"
-                type="number"
-                class="form-input"
-                placeholder="Ingrese el monto del plan"
-                min="0"
-                step="1000"
-              />
-            </div>
+            <input
+              v-model="previsionLabel"
+              type="text"
+              class="form-input"
+              readonly
+              disabled
+            />
           </div>
 
-          <!-- Gratificación -->
+          <!-- Gratificación (siempre activa) -->
           <div class="form-section">
             <label class="field-label">Gratificación</label>
-            <div class="radio-group">
-              <label
-                v-for="option in gratificacionOptions"
-                :key="option.label"
-                class="radio-option"
-              >
-                <input
-                  v-model="formData.tieneGratificacion"
-                  type="radio"
-                  :value="option.value"
-                  class="radio-input"
-                />
-                <span class="radio-label">{{ option.label }}</span>
-              </label>
-            </div>
+            <input
+              v-model="gratificacionLabel"
+              type="text"
+              class="form-input"
+              readonly
+              disabled
+            />
             
+            <!-- Tope de gratificación -->
+            <div class="gratificacion-tope-info">
+              <small class="tope-text">
+                <i class="pi pi-info-circle"></i>
+                Tope máximo: {{ formatCurrency(GRATIFICACION_TOPE) }}
+              </small>
+            </div>
           </div>
 
           <!-- Colación -->
           <div class="form-section">
             <label class="field-label">Colación</label>
             <input
-              v-model.number="formData.asignacionColacion"
-              type="number"
+              v-model="colacionFormatted"
+              type="text"
               class="form-input"
-              placeholder="Monto de colación"
-              min="0"
-              step="1000"
+              placeholder="Monto automático"
+              readonly
+              disabled
             />
           </div>
 
-          <!-- Transporte -->
+          <!-- Movilización -->
           <div class="form-section">
-            <label class="field-label">Transporte</label>
+            <label class="field-label">Movilización</label>
             <input
-              v-model.number="formData.asignacionTransporte"
-              type="number"
+              v-model="movilizacionFormatted"
+              type="text"
               class="form-input"
-              placeholder="Monto de transporte"
-              min="0"
-              step="1000"
+              placeholder="Monto automático"
+              readonly
+              disabled
             />
           </div>
 
-          <!-- Asignación Familiar -->
+          <!-- Información de rangos -->
           <div class="form-section">
-            <label class="field-label">Asignación Familiar</label>
-            <input
-              v-model.number="formData.asignacionFamiliar"
-              type="number"
-              class="form-input"
-              placeholder="Monto de asignación familiar"
-              min="0"
-              step="1000"
-            />
+            <div class="rangos-info">
+              <small class="rangos-title">
+                <i class="pi pi-info-circle"></i>
+                Rangos de asignaciones según sueldo líquido:
+              </small>
+              <div class="rangos-list">
+                <div class="rango-item">
+                  <span class="rango-sueldo">$0 - $500.000:</span>
+                  <span class="rango-monto">$12.500 c/u</span>
+                </div>
+                <div class="rango-item">
+                  <span class="rango-sueldo">$500.001 - $1.000.000:</span>
+                  <span class="rango-monto">$25.000 c/u</span>
+                </div>
+                <div class="rango-item">
+                  <span class="rango-sueldo">$1.000.001 - $1.500.000:</span>
+                  <span class="rango-monto">$50.000 c/u</span>
+                </div>
+                <div class="rango-item">
+                  <span class="rango-sueldo">$1.500.001 o más:</span>
+                  <span class="rango-monto">$100.000 c/u</span>
+                </div>
+              </div>
+            </div>
           </div>
+
 
           <!-- Botón calcular -->
           <div class="form-section">
@@ -210,7 +200,7 @@
                       <span class="detail-amount">{{ formatCurrency(calculationResult.haberes.asignacion_colacion) }}</span>
                     </div>
                     <div v-if="calculationResult.haberes.asignacion_transporte > 0" class="detail-item">
-                      <span class="detail-label">Transporte:</span>
+                      <span class="detail-label">Movilización:</span>
                       <span class="detail-amount">{{ formatCurrency(calculationResult.haberes.asignacion_transporte) }}</span>
                     </div>
                     <div v-if="calculationResult.haberes.asignacion_otros > 0" class="detail-item">
@@ -303,6 +293,17 @@ import DotLoader from '../../../components/DotLoader.vue';
 // Composables
 const router = useRouter();
 
+// Constantes
+const GRATIFICACION_TOPE = 4750000; // Tope máximo de gratificación
+
+// Matriz de rangos para colación y movilización
+const RANGOS_ASIGNACIONES = [
+  { min: 0, max: 500000, colacion: 12500, movilizacion: 12500 },
+  { min: 500001, max: 1000000, colacion: 25000, movilizacion: 25000 },
+  { min: 1000001, max: 1500000, colacion: 50000, movilizacion: 50000 },
+  { min: 1500001, max: Infinity, colacion: 100000, movilizacion: 100000 }
+];
+
 // Estado reactivo
 
 // Opciones para selects
@@ -314,41 +315,97 @@ const gratificacionOptions = ref(GRATIFICACION_OPTIONS);
 // Datos del formulario
 const formData = ref({
   sueldoLiquidoDeseado: 0,
-  tipoContrato: '',
+  tipoContrato: 1, // Siempre indefinido (valor 1)
   afp: '',
-  prevision: '',
+  prevision: 'Fonasa', // Siempre Fonasa
   planIsapre: 0,
-  tieneGratificacion: false,
+  tieneGratificacion: true, // Siempre con gratificación
   gratificacion: 0,
-  asignacionColacion: 0,
-  asignacionTransporte: 0,
-  asignacionFamiliar: 0,
+  asignacionColacion: 0, // Se calcula dinámicamente
+  asignacionTransporte: 0, // Se calcula dinámicamente
+  asignacionFamiliar: 0, // Eliminado pero mantenido para compatibilidad
   tolerancia: 100,
   maxIteraciones: 100
 });
+
+// Variables para formateo de inputs
+const sueldoLiquidoFormateado = ref('');
+const planIsapreFormateado = ref('');
 
 // Estados de cálculo
 const isCalculating = ref(false);
 const calculationResult = ref<CalculoSueldoBrutoResponse | null>(null);
 const calculationError = ref('');
 
+// Función para obtener asignaciones según el sueldo
+const getAsignacionesPorSueldo = (sueldo: number) => {
+  const rango = RANGOS_ASIGNACIONES.find(r => sueldo >= r.min && sueldo <= r.max);
+  return rango || RANGOS_ASIGNACIONES[0]; // Por defecto el primer rango
+};
+
+// Computed properties
+const tipoContratoLabel = computed(() => 'Indefinido');
+const previsionLabel = computed(() => 'Fonasa');
+const gratificacionLabel = computed(() => 'Sí');
+
+const asignacionesActuales = computed(() => {
+  return getAsignacionesPorSueldo(formData.value.sueldoLiquidoDeseado);
+});
+
+const colacionFormatted = computed(() => {
+  return formatCurrency(asignacionesActuales.value.colacion);
+});
+
+const movilizacionFormatted = computed(() => {
+  return formatCurrency(asignacionesActuales.value.movilizacion);
+});
+
 // Validación para habilitar el botón calcular
 const canCalculate = computed(() => {
   return formData.value.sueldoLiquidoDeseado > 0 && 
-         formData.value.tipoContrato !== '' && 
-         formData.value.afp !== '' && 
-         formData.value.prevision !== '' &&
-         (!formData.value.prevision || formData.value.prevision === 'Fonasa' || 
-          (formData.value.prevision === 'Isapre' && formData.value.planIsapre > 0));
+         formData.value.afp !== '';
 });
 
 
-// Función para manejar cambio de previsión
-const onPrevisionChange = () => {
-  if (formData.value.prevision !== 'Isapre') {
-    formData.value.planIsapre = 0;
+// Funciones para formateo de números
+const formatNumberWithThousands = (value: number): string => {
+  return new Intl.NumberFormat('es-CL').format(value);
+};
+
+const parseFormattedNumber = (value: string): number => {
+  return parseInt(value.replace(/\./g, '')) || 0;
+};
+
+// Funciones para manejo de inputs con separador de miles
+const onSueldoLiquidoInput = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const numericValue = parseFormattedNumber(target.value);
+  formData.value.sueldoLiquidoDeseado = numericValue;
+  
+  // Actualizar asignaciones según el nuevo sueldo
+  const asignaciones = getAsignacionesPorSueldo(numericValue);
+  formData.value.asignacionColacion = asignaciones.colacion;
+  formData.value.asignacionTransporte = asignaciones.movilizacion;
+};
+
+const formatSueldoLiquido = () => {
+  if (formData.value.sueldoLiquidoDeseado > 0) {
+    sueldoLiquidoFormateado.value = formatNumberWithThousands(formData.value.sueldoLiquidoDeseado);
   }
 };
+
+const onPlanIsapreInput = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const numericValue = parseFormattedNumber(target.value);
+  formData.value.planIsapre = numericValue;
+};
+
+const formatPlanIsapre = () => {
+  if (formData.value.planIsapre > 0) {
+    planIsapreFormateado.value = formatNumberWithThousands(formData.value.planIsapre);
+  }
+};
+
 
 // Función principal de cálculo
 const calcular = async () => {
@@ -361,14 +418,14 @@ const calcular = async () => {
     // Preparar datos para la API
     const requestData: CalculoSueldoBrutoRequest = {
       sueldo_liquido_deseado: formData.value.sueldoLiquidoDeseado,
-      tipo_contrato: Number(formData.value.tipoContrato),
+      tipo_contrato: formData.value.tipoContrato, // Siempre 1 (indefinido)
       afp: formData.value.afp,
       salud: formData.value.prevision,
       plan_isapre: formData.value.prevision === 'Isapre' ? formData.value.planIsapre : undefined,
-      gratificacion: formData.value.tieneGratificacion ,
-      asignacion_familiar: formData.value.asignacionFamiliar || 0,
-      asignacion_colacion: formData.value.asignacionColacion || 0,
-      asignacion_transporte: formData.value.asignacionTransporte || 0,
+      gratificacion: formData.value.tieneGratificacion,
+      asignacion_familiar: 0, // Eliminado
+      asignacion_colacion: formData.value.asignacionColacion,
+      asignacion_transporte: formData.value.asignacionTransporte,
       asignacion_otros: 0,
       tolerancia: formData.value.tolerancia,
       max_iteraciones: formData.value.maxIteraciones
@@ -387,7 +444,15 @@ const calcular = async () => {
 
 // Hooks del ciclo de vida
 onMounted(() => {
-  // Inicialización si es necesaria
+  // Inicializar valores por defecto
+  formData.value.tieneGratificacion = true;
+  formData.value.tipoContrato = 1; // Indefinido
+  formData.value.prevision = 'Fonasa'; // Siempre Fonasa
+  
+  // Inicializar asignaciones con el primer rango
+  const asignacionesIniciales = RANGOS_ASIGNACIONES[0];
+  formData.value.asignacionColacion = asignacionesIniciales.colacion;
+  formData.value.asignacionTransporte = asignacionesIniciales.movilizacion;
 });
 </script>
 
@@ -453,6 +518,12 @@ onMounted(() => {
   box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
 }
 
+.form-input:disabled {
+  background-color: #f3f4f6;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
 .select-wrapper {
   position: relative;
 }
@@ -509,6 +580,73 @@ onMounted(() => {
 .isapre-amount-field,
 .gratificacion-amount-field {
   margin-top: 1rem;
+}
+
+.gratificacion-tope-info {
+  margin-top: 0.75rem;
+  padding: 0.5rem;
+  background-color: #eff6ff;
+  border-radius: 0.375rem;
+  border-left: 3px solid #3b82f6;
+}
+
+.tope-text {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #1e40af;
+  font-weight: 500;
+}
+
+.tope-text i {
+  color: #3b82f6;
+}
+
+.rangos-info {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background-color: #f0f9ff;
+  border-radius: 0.375rem;
+  border-left: 3px solid #0ea5e9;
+}
+
+.rangos-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #0c4a6e;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.rangos-title i {
+  color: #0ea5e9;
+}
+
+.rangos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.rango-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.7rem;
+  padding: 0.25rem 0;
+}
+
+.rango-sueldo {
+  color: #475569;
+  font-weight: 500;
+}
+
+.rango-monto {
+  color: #0c4a6e;
+  font-weight: 600;
 }
 
 .calculate-button {
