@@ -3,7 +3,7 @@
     <div class="step-header">
       <h3 class="step-title">Ingresar Datos por Colaborador</h3>
       <p class="step-description">
-        Complete la información de horas extras y bono pactado para cada colaborador
+        Complete el monto del bono para cada colaborador
       </p>
     </div>
 
@@ -53,41 +53,9 @@
           <!-- Formulario de datos -->
           <div class="form-section">
             <div class="form-grid">
-              <!-- Valor hora extra (readonly) -->
-              <div class="form-field">
-                <label class="field-label">Valor Hora Extra (Bruto)</label>
-                <div class="input-group">
-                  <input
-                    :value="formatCurrency(colaboradorData.valorHoraExtra)"
-                    type="text"
-                    class="form-input readonly-input"
-                    readonly
-                  />
-                  <div v-if="colaboradorData.isLoadingCompensacion" class="loading-indicator">
-                    <i class="pi pi-spin pi-spinner"></i>
-                  </div>
-                </div>
-                <small v-if="colaboradorData.compensacionError" class="field-error">
-                  <i class="pi pi-exclamation-triangle"></i>
-                  {{ colaboradorData.compensacionError }}
-                </small>
-              </div>
-
-              <!-- Horas extras trabajadas -->
-              <div class="form-field">
-                <label class="field-label">Horas Extras Trabajadas</label>
-                <input
-                  v-model.number="colaboradorData.horasExtrasTrabajadas"
-                  @blur="formatHorasExtrasOnBlur($event, colaboradorData)"
-                  type="text"
-                  class="form-input"
-                  placeholder="0"
-                />
-              </div>
-
               <!-- Monto bono pactado -->
               <div class="form-field">
-                <label class="field-label">Monto Bono Pactado</label>
+                <label class="field-label">Monto Bono Líquido</label>
                 <input
                   v-model.number="colaboradorData.montoBonoPactado"
                   @blur="formatMontoBonoOnBlur($event, colaboradorData)"
@@ -193,7 +161,6 @@ import {
 // Interfaces
 interface ColaboradorDataForm {
   colaborador: Colaborador;
-  horasExtrasTrabajadas: number;
   montoBonoPactado: number;
   afp: string;
   valorHoraExtra: number;
@@ -231,18 +198,14 @@ const allFormsValid = computed(() => {
 
 // Funciones
 const isColaboradorDataValid = (data: ColaboradorDataForm): boolean => {
-  return data.valorHoraExtra > 0 && 
-         data.horasExtrasTrabajadas > 0 && 
-         data.montoBonoPactado > 0 &&
+  return data.montoBonoPactado > 0 &&
          data.afp !== '' && // AFP debe estar cargada desde la API
-         !data.isLoadingCompensacion && 
          !data.isLoadingAfp; // No debe estar cargando datos
 };
 
 const initializeColaboradoresData = async () => {
   colaboradoresDataLocal.value = props.colaboradores.map(colaborador => ({
     colaborador,
-    horasExtrasTrabajadas: 0,
     montoBonoPactado: 0,
     afp: '',
     valorHoraExtra: 0,
@@ -303,7 +266,6 @@ const handleNext = () => {
     // Actualizar el modelo con los datos locales
     colaboradoresData.value = colaboradoresDataLocal.value.map(data => ({
       colaborador: data.colaborador,
-      horasExtrasTrabajadas: data.horasExtrasTrabajadas,
       montoBonoPactado: data.montoBonoPactado,
       afp: data.afp,
       valorHoraExtra: data.valorHoraExtra
@@ -318,13 +280,6 @@ const formatMontoBonoOnBlur = (event: Event, colaboradorData: ColaboradorDataFor
   const target = event.target as HTMLInputElement;
   if (colaboradorData.montoBonoPactado > 0) {
     target.value = formatNumberForInput(colaboradorData.montoBonoPactado);
-  }
-};
-
-const formatHorasExtrasOnBlur = (event: Event, colaboradorData: ColaboradorDataForm) => {
-  const target = event.target as HTMLInputElement;
-  if (colaboradorData.horasExtrasTrabajadas > 0) {
-    target.value = formatNumberForInput(colaboradorData.horasExtrasTrabajadas);
   }
 };
 
@@ -516,7 +471,6 @@ onMounted(() => {
   font-size: 0.75rem;
   margin-top: 0.25rem;
 }
-
 
 .validation-status {
   display: flex;

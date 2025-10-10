@@ -93,6 +93,8 @@ const activeTab = computed(() => {
   const currentPath = route.path;
   if (currentPath.includes('bono-sabados')) {
     return 'bono_sabados';
+  } else if (currentPath.includes('bono')) {
+    return 'bono';
   } else if (currentPath.includes('sueldo-bruto')) {
     return 'sueldo_bruto';
   }

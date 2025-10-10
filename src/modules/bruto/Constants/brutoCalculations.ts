@@ -29,7 +29,7 @@ export function validateCalculoBrutoData(data: CalculoBrutoRequest): ValidationE
   if (!data.valorHoraExtra || data.valorHoraExtra <= 0) {
     errors.push({
       field: 'valorHoraExtra',
-      message: BRUTO_CONSTANTS.ERROR_MESSAGES.INVALID_HOURLY_RATE
+      message: BRUTO_CONSTANTS.ERROR_MESSAGES.INVALID_HOUR_VALUE
     });
   }
 
@@ -38,7 +38,7 @@ export function validateCalculoBrutoData(data: CalculoBrutoRequest): ValidationE
       data.horasExtrasTrabajadas > BRUTO_CONSTANTS.MAX_HOURS_WORKED) {
     errors.push({
       field: 'horasExtrasTrabajadas',
-      message: BRUTO_CONSTANTS.ERROR_MESSAGES.INVALID_HOURS
+      message: BRUTO_CONSTANTS.ERROR_MESSAGES.INVALID_HOURS_WORKED
     });
   }
 
@@ -47,7 +47,7 @@ export function validateCalculoBrutoData(data: CalculoBrutoRequest): ValidationE
       data.montoBonoPactado > BRUTO_CONSTANTS.MAX_BONUS_AMOUNT) {
     errors.push({
       field: 'montoBonoPactado',
-      message: BRUTO_CONSTANTS.ERROR_MESSAGES.INVALID_BONUS
+      message: BRUTO_CONSTANTS.ERROR_MESSAGES.INVALID_BONUS_AMOUNT
     });
   }
 
@@ -117,6 +117,61 @@ export function formatCurrency(amount: number): string {
  */
 export function formatNumber(amount: number): string {
   return new Intl.NumberFormat(BRUTO_CONSTANTS.CURRENCY_FORMAT.locale).format(amount);
+}
+
+/**
+ * Formatea un número para mostrar en input con separadores de miles
+ * @param value Valor numérico
+ * @returns String formateado para input
+ */
+export function formatNumberForInput(value: number | string): string {
+  if (!value && value !== 0) return '';
+  const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^\d.-]/g, '')) : value;
+  if (isNaN(numValue)) return '';
+  return formatNumber(numValue);
+}
+
+/**
+ * Convierte un string formateado de input a número
+ * @param formattedValue String con formato de separadores
+ * @returns Número sin formato
+ */
+export function parseFormattedNumber(formattedValue: string): number {
+  if (!formattedValue) return 0;
+  // Remover separadores de miles (puntos) pero mantener decimales (comas)
+  const cleanValue = formattedValue.replace(/\./g, '').replace(',', '.');
+  const numValue = parseFloat(cleanValue);
+  return isNaN(numValue) ? 0 : numValue;
+}
+
+/**
+ * Maneja la entrada de números en inputs con formato
+ * @param event Evento de input
+ * @param callback Función callback para actualizar el valor
+ */
+export function handleNumberInput(event: Event, callback: (value: number) => void): void {
+  const target = event.target as HTMLInputElement;
+  const cursorPosition = target.selectionStart || 0;
+  const rawValue = parseFormattedNumber(target.value);
+  
+  // Actualizar el valor en el modelo
+  callback(rawValue);
+  
+  // Formatear el valor y mantener la posición del cursor
+  const formattedValue = formatNumberForInput(rawValue);
+  if (formattedValue !== target.value) {
+    target.value = formattedValue;
+    
+    // Calcular nueva posición del cursor considerando los separadores agregados
+    const originalLength = target.value.length;
+    const newLength = formattedValue.length;
+    const newCursorPosition = Math.min(cursorPosition + (newLength - originalLength), newLength);
+    
+    // Restaurar posición del cursor
+    setTimeout(() => {
+      target.setSelectionRange(newCursorPosition, newCursorPosition);
+    }, 0);
+  }
 }
 
 /**

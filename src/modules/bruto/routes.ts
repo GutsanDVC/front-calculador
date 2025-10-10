@@ -29,6 +29,16 @@ export const brutoRoutes: RouteRecordRaw[] = [
         }
       },
       {
+        path: 'bono',
+        name: 'bruto-bono',
+        component: () => import('./Views/BonoPage.vue'),
+        meta: {
+          title: 'Bonos - Calculador de Bruto',
+          requiresAuth: true,
+          breadcrumb: 'Bonos'
+        }
+      },
+      {
         path: 'sueldo-bruto',
         name: 'bruto-sueldo-bruto',
         component: () => import('./Views/SueldoBrutoPage.vue'),

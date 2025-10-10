@@ -44,6 +44,11 @@ export const CALCULATOR_TABS = [
     route: '/panel/bruto/bono-sabados'
   },
   {
+    id: 'bono',
+    label: 'Bonos',
+    route: '/panel/bruto/bono'
+  },
+  {
     id: 'sueldo_bruto',
     label: 'Sueldo Bruto',
     route: '/panel/bruto/sueldo-bruto'
