@@ -66,7 +66,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { Utilities } from '../../../shared/classes/Utilities';
 // Importaciones del módulo
-import { CALCULATOR_TABS } from '../Constants/bruto.constants';
+import { CALCULATOR_TABS, INGRESO_MINIMO_MENSUAL } from '../Constants/bruto.constants';
 import { formatCurrency } from '../Constants/brutoCalculations';
 import { 
   ValoresEconomicos, 
@@ -84,9 +84,6 @@ const calculatorTabs = ref(CALCULATOR_TABS);
 const valoresEconomicos = ref<ValoresEconomicos | null>(null);
 const isLoadingValores = ref(false);
 const valoresError = ref('');
-
-// Constante del ingreso mínimo mensual
-const INGRESO_MINIMO_MENSUAL = 529000;
 
 // Tab activo basado en la ruta actual
 const activeTab = computed(() => {

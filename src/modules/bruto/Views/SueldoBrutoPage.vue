@@ -21,7 +21,7 @@
           </div>
 
           <!-- Tipo de contrato (siempre indefinido) -->
-          <div class="form-section">
+          <!-- <div class="form-section">
             <label class="field-label">Tipo de contrato</label>
             <input
               v-model="tipoContratoLabel"
@@ -30,7 +30,7 @@
               readonly
               disabled
             />
-          </div>
+          </div> -->
 
           <!-- AFP -->
           <div class="form-section">
@@ -77,7 +77,7 @@
             <div class="gratificacion-tope-info">
               <small class="tope-text">
                 <i class="pi pi-info-circle"></i>
-                Tope máximo: {{ formatCurrency(GRATIFICACION_TOPE) }}
+                Tope máximo mensual: {{ formatCurrency(GRATIFICACION_TOPE) }} (4.75 x Ingreso Mínimo Mensual/12)
               </small>
             </div>
           </div>
@@ -282,7 +282,8 @@ import {
   AFP_OPTIONS,
   PREVISION_OPTIONS,
   GRATIFICACION_OPTIONS,
-  BRUTO_CONSTANTS
+  BRUTO_CONSTANTS,
+  GRATIFICACION_TOPE
 } from '../Constants/bruto.constants';
 import { calcularSueldoBrutoDesdeNeto } from '../Repositories/brutoRepository';
 import { formatCurrency, formatNumber } from '../Constants/brutoCalculations';
@@ -292,9 +293,6 @@ import DotLoader from '../../../components/DotLoader.vue';
 
 // Composables
 const router = useRouter();
-
-// Constantes
-const GRATIFICACION_TOPE = 4750000; // Tope máximo de gratificación
 
 // Matriz de rangos para colación y movilización
 const RANGOS_ASIGNACIONES = [
@@ -324,7 +322,7 @@ const formData = ref({
   asignacionColacion: 0, // Se calcula dinámicamente
   asignacionTransporte: 0, // Se calcula dinámicamente
   asignacionFamiliar: 0, // Eliminado pero mantenido para compatibilidad
-  tolerancia: 100,
+  tolerancia: 1,
   maxIteraciones: 100
 });
 

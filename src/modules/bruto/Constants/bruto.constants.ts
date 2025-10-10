@@ -36,6 +36,11 @@ export const BRUTO_CONSTANTS = {
   }
 } as const;
 
+// Constantes económicas
+export const INGRESO_MINIMO_MENSUAL = 529000;
+export const INGRESO_MINIMO_ANUAL = INGRESO_MINIMO_MENSUAL * 12;
+export const GRATIFICACION_TOPE = (INGRESO_MINIMO_MENSUAL * 4.75)/12;
+
 // Configuración de las pestañas del calculador
 export const CALCULATOR_TABS = [
   {
@@ -53,12 +58,6 @@ export const CALCULATOR_TABS = [
     label: 'Sueldo Bruto',
     route: '/panel/bruto/sueldo-bruto'
   }
-  // Las siguientes pestañas se habilitarán cuando se implementen las vistas:
-  // {
-  //   id: 'bonos',
-  //   label: 'Bonos',
-  //   route: '/panel/bruto/bonos'
-  // }
 ] as const;
 
 // Opciones para los selects de Sueldo Bruto
