@@ -110,27 +110,34 @@
 
           <!-- Información de rangos -->
           <div class="form-section">
-            <div class="rangos-info">
+            <div v-if="isLoadingRangos" class="loading-rangos">
+              <i class="pi pi-spin pi-spinner"></i>
+              <small>Cargando rangos...</small>
+            </div>
+            
+            <div v-else-if="rangosError" class="error-rangos">
+              <i class="pi pi-exclamation-triangle"></i>
+              <small>{{ rangosError }}</small>
+            </div>
+            
+            <div v-else-if="rangosAsignaciones.length > 0" class="rangos-info">
               <small class="rangos-title">
                 <i class="pi pi-info-circle"></i>
                 Rangos de asignaciones según sueldo líquido:
               </small>
               <div class="rangos-list">
-                <div class="rango-item">
-                  <span class="rango-sueldo">$0 - $500.000:</span>
-                  <span class="rango-monto">$12.500 c/u</span>
-                </div>
-                <div class="rango-item">
-                  <span class="rango-sueldo">$500.001 - $1.000.000:</span>
-                  <span class="rango-monto">$25.000 c/u</span>
-                </div>
-                <div class="rango-item">
-                  <span class="rango-sueldo">$1.000.001 - $1.500.000:</span>
-                  <span class="rango-monto">$50.000 c/u</span>
-                </div>
-                <div class="rango-item">
-                  <span class="rango-sueldo">$1.500.001 o más:</span>
-                  <span class="rango-monto">$100.000 c/u</span>
+                <div 
+                  v-for="rango in rangosAsignaciones" 
+                  :key="`${rango.minimo}-${rango.maximo}`"
+                  class="rango-item"
+                >
+                  <span class="rango-sueldo">
+                    {{ formatCurrency(rango.minimo) }} - 
+                    {{ rango.maximo === Infinity || rango.maximo >= 999999999 ? 'o más' : formatCurrency(rango.maximo) }}:
+                  </span>
+                  <span class="rango-monto">
+                    {{ formatCurrency(rango.colacion) }} c/u
+                  </span>
                 </div>
               </div>
             </div>
@@ -287,6 +294,7 @@ import {
 } from '../Constants/bruto.constants';
 import { calcularSueldoBrutoDesdeNeto } from '../Repositories/brutoRepository';
 import { formatCurrency, formatNumber } from '../Constants/brutoCalculations';
+import { obtenerRangosColacionMovilizacion, RangoColacionMovilizacion } from '../Services/rangosService';
 
 // Componentes
 import DotLoader from '../../../components/DotLoader.vue';
@@ -294,13 +302,10 @@ import DotLoader from '../../../components/DotLoader.vue';
 // Composables
 const router = useRouter();
 
-// Matriz de rangos para colación y movilización
-const RANGOS_ASIGNACIONES = [
-  { min: 0, max: 500000, colacion: 12500, movilizacion: 12500 },
-  { min: 500001, max: 1000000, colacion: 25000, movilizacion: 25000 },
-  { min: 1000001, max: 1500000, colacion: 50000, movilizacion: 50000 },
-  { min: 1500001, max: Infinity, colacion: 100000, movilizacion: 100000 }
-];
+// Estado para los rangos dinámicos
+const rangosAsignaciones = ref<RangoColacionMovilizacion[]>([]);
+const isLoadingRangos = ref(false);
+const rangosError = ref('');
 
 // Estado reactivo
 
@@ -337,8 +342,8 @@ const calculationError = ref('');
 
 // Función para obtener asignaciones según el sueldo
 const getAsignacionesPorSueldo = (sueldo: number) => {
-  const rango = RANGOS_ASIGNACIONES.find(r => sueldo >= r.min && sueldo <= r.max);
-  return rango || RANGOS_ASIGNACIONES[0]; // Por defecto el primer rango
+  const rango = rangosAsignaciones.value.find(r => sueldo >= r.minimo && sueldo <= r.maximo);
+  return rango || (rangosAsignaciones.value.length > 0 ? rangosAsignaciones.value[0] : { colacion: 0, movilizacion: 0, minimo: 0, maximo: 0 });
 };
 
 // Computed properties
@@ -440,17 +445,38 @@ const calcular = async () => {
   }
 };
 
+// Función para cargar rangos desde la API
+const cargarRangos = async () => {
+  isLoadingRangos.value = true;
+  rangosError.value = '';
+  
+  try {
+    const rangos = await obtenerRangosColacionMovilizacion();
+    rangosAsignaciones.value = rangos;
+    
+    // Inicializar asignaciones con el primer rango si hay datos
+    if (rangos.length > 0) {
+      const asignacionesIniciales = rangos[0];
+      formData.value.asignacionColacion = asignacionesIniciales.colacion;
+      formData.value.asignacionTransporte = asignacionesIniciales.movilizacion;
+    }
+  } catch (error: any) {
+    rangosError.value = error.message || 'Error al cargar los rangos';
+    console.error('Error al cargar rangos:', error);
+  } finally {
+    isLoadingRangos.value = false;
+  }
+};
+
 // Hooks del ciclo de vida
-onMounted(() => {
+onMounted(async () => {
   // Inicializar valores por defecto
   formData.value.tieneGratificacion = true;
   formData.value.tipoContrato = 1; // Indefinido
   formData.value.prevision = 'Fonasa'; // Siempre Fonasa
   
-  // Inicializar asignaciones con el primer rango
-  const asignacionesIniciales = RANGOS_ASIGNACIONES[0];
-  formData.value.asignacionColacion = asignacionesIniciales.colacion;
-  formData.value.asignacionTransporte = asignacionesIniciales.movilizacion;
+  // Cargar rangos desde la API
+  await cargarRangos();
 });
 </script>
 
@@ -645,6 +671,44 @@ onMounted(() => {
 .rango-monto {
   color: #0c4a6e;
   font-weight: 600;
+}
+
+.loading-rangos {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background-color: #fef3c7;
+  border-radius: 0.375rem;
+  border-left: 3px solid #f59e0b;
+}
+
+.loading-rangos small {
+  color: #92400e;
+  font-weight: 500;
+}
+
+.loading-rangos i {
+  color: #f59e0b;
+}
+
+.error-rangos {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background-color: #fef2f2;
+  border-radius: 0.375rem;
+  border-left: 3px solid #ef4444;
+}
+
+.error-rangos small {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.error-rangos i {
+  color: #ef4444;
 }
 
 .calculate-button {
